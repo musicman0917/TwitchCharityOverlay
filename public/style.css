@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Tavern Subathon Overlay — cozy fantasy tavern theme (+ Purple alt theme,
+   Tavern Subathon Overlay — cozy fantasy tavern theme (+ Disney alt theme,
    shared with the NOM Alerts overlay system)
    Designed for a 1920x1080 OBS Browser Source (transparent background).
    ========================================================================== */
@@ -38,8 +38,8 @@
   --font-body: 'Lora', serif;
 }
 
-/* Purple theme — matches NOM Alerts' alternate palette */
-:root[data-theme='purple'] {
+/* Disney theme — matches NOM Alerts' body[data-theme="disney"] palette */
+:root[data-theme='disney'] {
   --card-bg-1: #1a0a2e;
   --card-bg-2: #0d0620;
   --card-border: #7b2fbe;

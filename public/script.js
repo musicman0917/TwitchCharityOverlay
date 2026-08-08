@@ -13,10 +13,10 @@ let goal = 1000;
 
 function applyTheme(theme) {
   const root = document.documentElement;
-  if (theme === 'purple') {
-    root.setAttribute('data-theme', 'purple');
+  if (theme === 'disney') {
+    root.setAttribute('data-theme', 'disney');
   } else {
-    root.removeAttribute('data-theme'); // 'tavern' (default)
+    root.removeAttribute('data-theme'); // 'tavern' (default) or any other unrecognized theme
   }
 }
 

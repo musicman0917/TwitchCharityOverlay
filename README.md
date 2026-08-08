@@ -108,28 +108,30 @@ pm2 logs nom-charity-overlay
   server process restarts — pm2 keeps the process alive so this should only happen on
   intentional restarts or crashes.
 
-## Shared theme (Tavern / Purple)
+## Shared theme (Tavern / Disney)
 
-This overlay shares the same Tavern/Purple theme toggle as NOM Alerts, controlled from
-`admin.html` on the Alerts app:
+This overlay shares the same theme toggle as NOM Alerts (`admin.html`), which has two themes:
+**Tavern** (default, amber/gold) and **Disney** (deep purple/gold — `body[data-theme="disney"]`
+in `nom-alerts.html`). The confirmed contract, captured directly from `nom-token-broker`:
 
-- On startup, the charity overlay backend fetches the current theme from `nom-token-broker`'s
-  `GET /theme-state` endpoint.
-- It then connects to `nom-token-broker`'s `/alerts-stream` SSE feed and listens for theme
-  change events, instantly re-broadcasting them to its own overlay clients over Socket.io
-  (`themeUpdate`) — so flipping the theme in admin.html updates both overlays at the same time.
+- `GET /theme-state` → `{"theme":"tavern"}` or `{"theme":"disney"}`
+- SSE on `/alerts-stream` → `data: {"type":"theme-switch","theme":"<name>"}` (no `event:` field —
+  every message is a plain `data:` line with a `type` discriminator)
+
+How it's wired up:
+
+- On startup, the charity overlay backend fetches the current theme from `/theme-state`.
+- It then connects to `/alerts-stream` and listens for `theme-switch` messages, instantly
+  re-broadcasting them to its own overlay clients over Socket.io (`themeUpdate`) — so flipping
+  the theme in admin.html updates both overlays at the same time.
 - If `nom-token-broker` isn't reachable (not started yet, wrong port, etc.), the charity
   overlay logs a warning, retries the SSE connection every 5 seconds, and falls back to the
   Tavern theme in the meantime — it never crashes or blocks on the Alerts app being up.
-
-**Note:** the exact SSE event name/payload `nom-token-broker` uses for theme changes wasn't
-available when this was built, so `handleSseMessage()` and `fetchInitialTheme()` in
-`server.js` accept a few reasonable shapes (`event: theme` with `{"theme":"purple"}`,
-`{"type":"theme","theme":"purple"}`, or a flat `{"theme":"purple"}`/`{"currentTheme":"purple"}`
-field). If the live sync doesn't pick up theme changes, check your actual `/theme-state`
-response shape and SSE event format and adjust those two functions to match — everything
-else (the CSS variables, the `themeUpdate` Socket.io broadcast, the frontend `data-theme`
-toggle) is already wired up and tested against both themes.
+- The backend doesn't hardcode the two theme names — it just relays whatever `theme` value
+  `nom-token-broker` reports. The frontend (`applyTheme()` in `public/script.js`) renders its
+  Disney skin only when `theme === 'disney'`, and falls back to the Tavern look for anything
+  else, so if NOM Alerts ever adds another theme this overlay won't get stuck — it'll just stay
+  on Tavern until a matching skin is added to `public/style.css`.
 
 If `NOM_ALERTS_BASE_URL` points somewhere unreachable, or you don't want theme sync at all,
 the overlay just stays on Tavern — no configuration needed to disable it.
