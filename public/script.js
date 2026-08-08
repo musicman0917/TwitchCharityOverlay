@@ -71,14 +71,10 @@ function renderMilestones() {
     marker.className = `goal-bar-marker${m.reached ? ' reached' : ''}`;
     marker.style.left = `${pct}%`;
 
-    const label = document.createElement('span');
-    label.className = 'goal-bar-marker-label';
-    label.textContent = formatMoney(m.amount);
-
     const tick = document.createElement('span');
     tick.className = 'goal-bar-marker-tick';
 
-    marker.append(label, tick);
+    marker.appendChild(tick);
     goalBarMarkersEl.appendChild(marker);
   }
 
