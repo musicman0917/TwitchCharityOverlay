@@ -322,7 +322,28 @@ html, body {
   color: var(--heading-color);
   letter-spacing: 0.03em;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
-  transition: color 0.4s ease;
+  transition: color 0.4s ease, opacity 0.3s ease;
+}
+
+.timer.paused {
+  opacity: 0.6;
+  animation: timerPausedPulse 1.6s ease-in-out infinite;
+}
+
+.timer.paused::after {
+  content: '⏸ PAUSED';
+  display: block;
+  font-family: var(--font-title);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent-strong);
+  margin-top: 2px;
+}
+
+@keyframes timerPausedPulse {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 0.85; }
 }
 
 /* Goal tracker */

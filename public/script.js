@@ -47,8 +47,9 @@ function formatMoney(amount) {
   })}`;
 }
 
-function updateTimer(seconds) {
+function updateTimer(seconds, paused) {
   timerEl.textContent = formatTimer(seconds);
+  timerEl.classList.toggle('paused', !!paused);
 }
 
 function updateGoal(totalRaised) {
@@ -229,7 +230,7 @@ function processAlertQueue() {
 // --------------------------------------------------------------------------
 socket.on('state', (data) => {
   if (typeof data.goal === 'number') goal = data.goal;
-  updateTimer(data.currentTimer);
+  updateTimer(data.currentTimer, data.timerPaused);
   updateGoal(data.totalRaised);
   if (data.latestDonorName) {
     updateLatestHero(data.latestDonorName, data.latestDonorAmount);
@@ -253,7 +254,7 @@ socket.on('themeUpdate', (data) => {
 });
 
 socket.on('timerTick', (data) => {
-  updateTimer(data.currentTimer);
+  updateTimer(data.currentTimer, data.timerPaused);
 });
 
 socket.on('totalUpdate', (data) => {
@@ -262,6 +263,8 @@ socket.on('totalUpdate', (data) => {
 });
 
 socket.on('newDonation', (data) => {
-  updateLatestHero(data.name, data.amount);
+  if (!data.test) {
+    updateLatestHero(data.name, data.amount);
+  }
   queueAlert(data.name, data.amount);
 });

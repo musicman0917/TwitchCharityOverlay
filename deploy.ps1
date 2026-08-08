@@ -33,6 +33,15 @@ if (Test-Path (Join-Path $dest ".git")) {
 Write-Host "Installing dependencies..."
 npm install
 
+if (-not (Test-Path ".env")) {
+    Copy-Item ".env.example" ".env"
+    Write-Host ""
+    Write-Host "Created .env from .env.example -- edit it now and set a real ADMIN_PASSWORD" -ForegroundColor Yellow
+    Write-Host "before using the admin portal at /admin.html. The overlay itself works fine" -ForegroundColor Yellow
+    Write-Host "without it; only /admin.html requires a password." -ForegroundColor Yellow
+    Write-Host ""
+}
+
 Write-Host "Starting/restarting with pm2..."
 # Avoid `pm2 jlist | ConvertFrom-Json` here -- on Windows pm2 dumps the full
 # process environment into jlist, which can contain keys that differ only by

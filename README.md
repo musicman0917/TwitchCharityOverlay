@@ -13,11 +13,16 @@ powered by an [Extra Life](https://www.extra-life.org/) / DonorDrive donation fe
 
 ```bash
 npm install
+cp .env.example .env   # then edit .env and set a real ADMIN_PASSWORD
 ```
+
+`.env` is gitignored — this repo is public, so never commit real secrets. `deploy.ps1`
+creates `.env` from `.env.example` automatically on first install if it's missing.
 
 ## Configuration
 
-The server reads optional environment variables (all have sensible defaults):
+The server reads optional environment variables (all have sensible defaults except
+`ADMIN_PASSWORD`, set via `.env` — see above):
 
 | Variable              | Default                 | Description                                        |
 |-----------------------|--------------------------|-----------------------------------------------------|
@@ -26,6 +31,7 @@ The server reads optional environment variables (all have sensible defaults):
 | `GOAL_AMOUNT`         | `1000`                   | Donation goal shown on the goal bar (in dollars)     |
 | `POLL_INTERVAL_MS`    | `15000`                  | How often to poll the Extra Life API (ms)            |
 | `NOM_ALERTS_BASE_URL` | `http://localhost:3010`  | Base URL of the `nom-token-broker` server, used for theme sync (see below) |
+| `ADMIN_PASSWORD`      | *(none)*                 | Password for the admin portal (`/admin.html`) — logins are rejected until this is set |
 
 ## Deployment (streaming PC — alongside NOM Alerts)
 
@@ -198,6 +204,42 @@ replay a pile of alerts for progress that already happened.
 
 Milestone amounts are independent of `GOAL_AMOUNT` — the goal bar always scales to
 `GOAL_AMOUNT`, so a milestone set above it will show its marker pinned at the right edge.
+
+## Admin portal
+
+`http://localhost:3011/admin.html` is a control panel for running the overlay during a
+stream, gated behind `ADMIN_PASSWORD` (set in `.env`, see Setup above). It's a separate
+static page, not linked from the overlay itself.
+
+**Trust model:** simple shared-password auth, same spirit as `nom-token-broker`'s
+`admin.html` — no rate limiting, no per-user accounts, sessions are random in-memory
+tokens that reset on server restart. This is fine for **localhost/LAN-only** use (the
+overlay is never added to the Cloudflare Tunnel) but is **not** hardened for internet
+exposure. Don't port-forward 3011 or add it to the tunnel.
+
+What it can do:
+
+- **Timer controls** — pause/resume the countdown, nudge it by ±1/±10 minutes or a custom
+  number of seconds, or reset to 04:00:00. A paused timer shows a "⏸ PAUSED" indicator on
+  the overlay itself so it's clear on-stream that it's intentional, not frozen/broken.
+- **Test alerts** — fire a donation alert (any name/amount, exercises the tier system) or a
+  milestone alert (any amount/label) on demand. These are visual/audio previews only — they
+  never touch the real timer, `totalRaised`, or the "Latest Hero" display, so testing mid-stream
+  is safe.
+- **Milestone editor** — add/edit/remove milestones through a form instead of hand-editing
+  `milestones.json`. Saving rewrites the file and silently recomputes which milestones count as
+  already-reached against the current total (same baseline logic as a server restart — no alert
+  spam from an edit).
+- **Sound upload** — replace the tier1/tier2/tier3 donation alert sound files directly from the
+  browser instead of copying files onto the server by hand. Takes effect immediately, no
+  restart needed (the overlay fetches sound files fresh each time an alert fires).
+
+All of this is backed by a small `/admin/*` API in `server.js`, protected by
+`requireAdminAuth` (checks a `Bearer <token>` header issued by `POST /admin/login`) on every
+route except the login itself. File uploads are validated (`audio/*` mimetype, 10MB limit)
+and always written to a server-controlled path derived from `donation-tiers.json` — the
+uploaded filename and the `tier` field are never used to build a filesystem path, so there's
+no path-traversal risk from a malformed request.
 
 ## Asset placeholders
 

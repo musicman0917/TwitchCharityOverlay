@@ -1,9 +1,13 @@
+require('dotenv').config();
+
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const axios = require('axios');
+const multer = require('multer');
 
 // ---------------------------------------------------------------------------
 // Config
@@ -25,6 +29,16 @@ const NOM_ALERTS_SSE_URL = `${NOM_ALERTS_BASE_URL}/alerts-stream`;
 const NOM_ALERTS_THEME_STATE_URL = `${NOM_ALERTS_BASE_URL}/theme-state`;
 const SSE_RECONNECT_DELAY_MS = 5000;
 
+// Admin portal — simple shared-password auth. Not meant for internet
+// exposure: this stays on port 3011, localhost/LAN-only, never on the
+// Cloudflare Tunnel. See README for the trust model.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+if (!ADMIN_PASSWORD) {
+  console.warn(
+    '[admin] ADMIN_PASSWORD is not set — the admin portal will reject all logins until it is configured.'
+  );
+}
+
 const PARTICIPANT_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}`;
 const DONATIONS_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}/donations`;
 
@@ -44,6 +58,8 @@ const nomAlertsClient = axios.create({
 // track render in order.
 // ---------------------------------------------------------------------------
 const MILESTONES_FILE = path.join(__dirname, 'milestones.json');
+const DONATION_TIERS_FILE = path.join(__dirname, 'public', 'donation-tiers.json');
+const SOUNDS_DIR = path.join(__dirname, 'public', 'Assets', 'Sounds');
 
 function loadMilestones() {
   try {
@@ -59,7 +75,41 @@ function loadMilestones() {
   }
 }
 
-const milestones = loadMilestones();
+let milestones = loadMilestones();
+
+// Overwrites milestones.json, reloads the in-memory list, and recomputes
+// which ones count as "reached" against the current total — silently, like
+// the startup baseline, since an admin edit isn't a real donation crossing
+// and shouldn't fire alerts.
+function saveMilestones(newMilestones) {
+  const cleaned = newMilestones
+    .filter((m) => typeof m.amount === 'number' && m.amount > 0 && typeof m.label === 'string' && m.label.trim())
+    .map((m) => ({ amount: m.amount, label: m.label.trim() }))
+    .sort((a, b) => a.amount - b.amount);
+
+  fs.writeFileSync(MILESTONES_FILE, JSON.stringify(cleaned, null, 2) + '\n');
+  milestones = cleaned;
+
+  state.reachedMilestones = new Set(
+    milestones.filter((m) => state.totalRaised >= m.amount).map((m) => m.amount)
+  );
+
+  console.log(`[milestones] admin updated milestones.json (${milestones.length} milestone(s))`);
+  io.emit('milestonesUpdate', { milestones: serializeMilestones() });
+  return milestones;
+}
+
+function loadDonationTiers() {
+  try {
+    const raw = fs.readFileSync(DONATION_TIERS_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('donation-tiers.json must be a JSON array');
+    return parsed;
+  } catch (err) {
+    console.warn(`[admin] could not read donation-tiers.json (${err.message})`);
+    return [];
+  }
+}
 
 // ---------------------------------------------------------------------------
 // In-memory state
@@ -75,6 +125,7 @@ const state = {
   theme: 'tavern',
   reachedMilestones: new Set(), // amounts already crossed
   milestonesChecked: false, // becomes true after the first milestone check
+  timerPaused: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -83,6 +134,8 @@ const state = {
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+app.use(express.json());
 
 // Serve overlay assets with no-cache headers so OBS Browser Source refreshes
 // always pick up the latest files instead of serving a stale cached copy.
@@ -112,6 +165,7 @@ function serializeState() {
     latestDonorAmount: state.latestDonorAmount,
     theme: state.theme,
     milestones: serializeMilestones(),
+    timerPaused: state.timerPaused,
   };
 }
 
@@ -166,11 +220,11 @@ function checkMilestones() {
 // Subathon timer tick (broadcast every second)
 // ---------------------------------------------------------------------------
 setInterval(() => {
-  if (state.currentTimer > 0) {
+  if (!state.timerPaused && state.currentTimer > 0) {
     state.currentTimer -= 1;
     if (state.currentTimer < 0) state.currentTimer = 0;
   }
-  io.emit('timerTick', { currentTimer: state.currentTimer });
+  io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
 }, 1000);
 
 // ---------------------------------------------------------------------------
@@ -333,6 +387,148 @@ function connectToAlertsThemeStream() {
 }
 
 fetchInitialTheme().then(connectToAlertsThemeStream);
+
+// ---------------------------------------------------------------------------
+// Admin portal API — timer controls, sound upload, test alerts, milestone
+// editing. Gated behind a shared password (ADMIN_PASSWORD env var); tokens
+// are random, in-memory, and lost on restart (re-login required). Not meant
+// for internet exposure -- see README.
+// ---------------------------------------------------------------------------
+const adminTokens = new Set();
+const soundUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+function passwordMatches(candidate) {
+  const a = Buffer.from(String(candidate));
+  const b = Buffer.from(ADMIN_PASSWORD);
+  if (a.length !== b.length) {
+    crypto.timingSafeEqual(a, a); // keep timing roughly constant either way
+    return false;
+  }
+  return crypto.timingSafeEqual(a, b);
+}
+
+function requireAdminAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : null;
+  if (!token || !adminTokens.has(token)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+app.post('/admin/login', (req, res) => {
+  const password = req.body && req.body.password;
+  if (!ADMIN_PASSWORD || typeof password !== 'string' || !passwordMatches(password)) {
+    return res.status(401).json({ error: 'Invalid password' });
+  }
+  const token = crypto.randomBytes(24).toString('hex');
+  adminTokens.add(token);
+  res.json({ token });
+});
+
+app.post('/admin/logout', requireAdminAuth, (req, res) => {
+  const token = req.headers.authorization.slice('Bearer '.length);
+  adminTokens.delete(token);
+  res.json({ ok: true });
+});
+
+app.get('/admin/state', requireAdminAuth, (req, res) => {
+  res.json(serializeState());
+});
+
+// -- Timer controls --
+app.post('/admin/timer/pause', requireAdminAuth, (req, res) => {
+  state.timerPaused = true;
+  io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
+  res.json({ ok: true, timerPaused: state.timerPaused });
+});
+
+app.post('/admin/timer/resume', requireAdminAuth, (req, res) => {
+  state.timerPaused = false;
+  io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
+  res.json({ ok: true, timerPaused: state.timerPaused });
+});
+
+app.post('/admin/timer/adjust', requireAdminAuth, (req, res) => {
+  const seconds = Number(req.body && req.body.seconds);
+  if (!Number.isFinite(seconds)) {
+    return res.status(400).json({ error: 'seconds must be a number' });
+  }
+  state.currentTimer = Math.max(0, state.currentTimer + seconds);
+  io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
+  res.json({ ok: true, currentTimer: state.currentTimer });
+});
+
+app.post('/admin/timer/reset', requireAdminAuth, (req, res) => {
+  state.currentTimer = STARTING_SECONDS;
+  io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
+  res.json({ ok: true, currentTimer: state.currentTimer });
+});
+
+// -- Test alerts — visual/audio preview only, never touches real state --
+app.post('/admin/test/donation', requireAdminAuth, (req, res) => {
+  const body = req.body || {};
+  const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'TestDonor';
+  const amount = Number(body.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'amount must be a positive number' });
+  }
+  io.emit('newDonation', { name, amount, test: true });
+  res.json({ ok: true });
+});
+
+app.post('/admin/test/milestone', requireAdminAuth, (req, res) => {
+  const body = req.body || {};
+  const amount = Number(body.amount);
+  const label = typeof body.label === 'string' && body.label.trim() ? body.label.trim() : 'Test milestone';
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'amount must be a positive number' });
+  }
+  io.emit('milestoneReached', { amount, label, test: true });
+  res.json({ ok: true });
+});
+
+// -- Milestone editor --
+app.get('/admin/milestones', requireAdminAuth, (req, res) => {
+  res.json({ milestones: serializeMilestones() });
+});
+
+app.post('/admin/milestones', requireAdminAuth, (req, res) => {
+  const incoming = req.body && req.body.milestones;
+  if (!Array.isArray(incoming)) {
+    return res.status(400).json({ error: 'milestones must be an array' });
+  }
+  saveMilestones(incoming);
+  res.json({ ok: true, milestones: serializeMilestones() });
+});
+
+// -- Sound upload for donation tiers --
+app.post('/admin/upload-sound', requireAdminAuth, soundUpload.single('file'), (req, res) => {
+  const tierId = req.body && req.body.tier;
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  if (!req.file.mimetype || !req.file.mimetype.startsWith('audio/')) {
+    return res.status(400).json({ error: 'File must be an audio file' });
+  }
+
+  const tiers = loadDonationTiers();
+  const tier = tiers.find((t) => t.id === tierId);
+  if (!tier || typeof tier.sound !== 'string') {
+    return res.status(400).json({ error: `Unknown tier "${tierId}"` });
+  }
+
+  // Destination is derived only from the filename portion of the
+  // server-controlled donation-tiers.json entry (never from user input or
+  // the uploaded file's own name), so this can't write outside SOUNDS_DIR.
+  const destPath = path.join(SOUNDS_DIR, path.basename(tier.sound));
+
+  fs.mkdirSync(SOUNDS_DIR, { recursive: true });
+  fs.writeFileSync(destPath, req.file.buffer);
+
+  console.log(`[admin] uploaded sound for ${tierId}: ${destPath} (${req.file.size} bytes)`);
+  res.json({ ok: true, tier: tierId, path: tier.sound });
+});
 
 // ---------------------------------------------------------------------------
 server.listen(PORT, () => {
