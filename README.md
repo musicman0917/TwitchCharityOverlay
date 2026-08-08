@@ -108,6 +108,31 @@ pm2 logs nom-charity-overlay
   server process restarts — pm2 keeps the process alive so this should only happen on
   intentional restarts or crashes.
 
+## Donation alert tiers + sound
+
+Larger donations get a bigger, longer, more glowing "A New Hero Approaches!" alert, plus a
+distinct sound. Thresholds, per-tier duration, and sound file paths are configured in
+`public/donation-tiers.json` (a purely client-side/presentational config — unlike
+`milestones.json`, the backend doesn't need to know about tiers at all):
+
+```json
+[
+  { "id": "tier1", "label": "Small Donation", "minAmount": 1, "durationMs": 5000, "sound": "Assets/Sounds/donation-tier-1.mp3" },
+  { "id": "tier2", "label": "Medium Donation", "minAmount": 25, "durationMs": 6500, "sound": "Assets/Sounds/donation-tier-2.mp3" },
+  { "id": "tier3", "label": "Large Donation", "minAmount": 100, "durationMs": 8000, "sound": "Assets/Sounds/donation-tier-3.mp3" }
+]
+```
+
+- A donation's tier is whichever entry has the highest `minAmount` that's still ≤ the amount
+  donated — edit the amounts/count/duration freely, no code changes needed.
+- **Sound files go in `public/Assets/Sounds/`** (see the README there) — until you drop real
+  files in, missing sounds fail silently (no console errors, no broken overlay), so it's safe
+  to deploy before you have final audio.
+- Visual escalation (bigger card, thicker gold border, stronger/pulsing glow, larger text) is
+  fixed in `public/style.css` under the `.alert-box.tier2` / `.alert-box.tier3` rules — these
+  aren't in the JSON since they're a design choice, not something you'd want to reconfigure
+  per-stream. tier1 uses the base `.alert-box`/`.alert-scroll` styles.
+
 ## Shared theme (Tavern / Disney)
 
 This overlay shares the same theme toggle as NOM Alerts (`admin.html`), which has two themes:

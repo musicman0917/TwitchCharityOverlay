@@ -145,6 +145,53 @@ function processMilestoneAlertQueue() {
 }
 
 // --------------------------------------------------------------------------
+// Donation tiers — thresholds/sound/duration are configured in
+// donation-tiers.json (fetched once below), purely a presentation concern:
+// bigger donations get a bigger, longer, more glowing alert plus a louder
+// tier of sound effect. Falls back to a single default tier if the file is
+// missing/unreachable so the alert still works either way.
+// --------------------------------------------------------------------------
+const DEFAULT_DONATION_TIER = { id: 'tier1', minAmount: 0, durationMs: 5000, sound: null };
+let donationTiers = [DEFAULT_DONATION_TIER];
+
+fetch('donation-tiers.json')
+  .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+  .then((data) => {
+    if (Array.isArray(data) && data.length) {
+      donationTiers = [...data].sort((a, b) => a.minAmount - b.minAmount);
+    }
+  })
+  .catch((err) => {
+    console.warn(`[donation-tiers] could not load donation-tiers.json (${err.message}); using default tier`);
+  });
+
+function getTierForAmount(amount) {
+  let match = donationTiers[0];
+  for (const tier of donationTiers) {
+    if (amount >= tier.minAmount) match = tier;
+  }
+  return match;
+}
+
+const DONATION_SOUND_VOLUME = 0.8;
+const donationSoundCache = {};
+
+function playDonationSound(tier) {
+  if (!tier.sound) return;
+  let audio = donationSoundCache[tier.id];
+  if (!audio) {
+    audio = new Audio(tier.sound);
+    audio.volume = DONATION_SOUND_VOLUME;
+    donationSoundCache[tier.id] = audio;
+  }
+  audio.currentTime = 0;
+  audio.play().catch(() => {
+    // Missing/unreadable sound file — silently no-op until a real file is
+    // dropped in public/Assets/Sounds/ (see the README there).
+  });
+}
+
+// --------------------------------------------------------------------------
 // Alert queue so overlapping donations still get shown one at a time
 // --------------------------------------------------------------------------
 const alertQueue = [];
@@ -160,9 +207,13 @@ function processAlertQueue() {
   const { name, amount } = alertQueue.shift();
   alertShowing = true;
 
+  const tier = getTierForAmount(amount);
+
   alertNameEl.textContent = name;
   alertAmountEl.textContent = formatMoney(amount);
-  alertBoxEl.classList.add('show');
+  alertBoxEl.classList.remove('tier1', 'tier2', 'tier3');
+  alertBoxEl.classList.add(tier.id, 'show');
+  playDonationSound(tier);
 
   setTimeout(() => {
     alertBoxEl.classList.remove('show');
@@ -170,7 +221,7 @@ function processAlertQueue() {
       alertShowing = false;
       processAlertQueue();
     }, 500); // matches CSS fade-out transition duration
-  }, 5000);
+  }, tier.durationMs || 5000);
 }
 
 // --------------------------------------------------------------------------
