@@ -1,0 +1,273 @@
+/* ==========================================================================
+   Tavern Subathon Overlay — cozy fantasy tavern theme
+   Designed for a 1920x1080 OBS Browser Source (transparent background).
+   ========================================================================== */
+
+:root {
+  --espresso: #2c1e16;
+  --espresso-dark: #1a110b;
+  --wood-light: #4a3222;
+  --wood-dark: #241811;
+  --parchment: #f1e3c6;
+  --parchment-dark: #e2cfa4;
+  --gold: #d4a94e;
+  --gold-bright: #f2c766;
+  --ink: #3b2a1c;
+  --shadow: rgba(0, 0, 0, 0.65);
+
+  --font-heading: 'MedievalSharp', cursive;
+  --font-title: 'Cinzel', serif;
+  --font-body: 'Lora', serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 1920px;
+  height: 1080px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--font-body);
+  color: var(--parchment);
+}
+
+/* --------------------------------------------------------------------------
+   Vignette — dark fantasy atmosphere around the frame edges
+   -------------------------------------------------------------------------- */
+.vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0) 45%,
+    rgba(20, 12, 6, 0.35) 75%,
+    rgba(10, 6, 3, 0.85) 100%
+  );
+}
+
+/* --------------------------------------------------------------------------
+   Asset placeholders — top right corner
+   -------------------------------------------------------------------------- */
+.asset-corner {
+  position: fixed;
+  top: 32px;
+  right: 32px;
+  z-index: 4;
+  display: flex;
+  gap: 16px;
+}
+
+.asset-box {
+  width: 130px;
+  height: 130px;
+  border: 3px dashed var(--gold);
+  border-radius: 8px;
+  background: rgba(44, 30, 22, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px;
+}
+
+.asset-box span {
+  font-family: var(--font-title);
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  color: var(--parchment-dark);
+  text-shadow: 0 2px 4px var(--shadow);
+}
+
+/* --------------------------------------------------------------------------
+   Alert box — "A New Hero Approaches!" popup, top-center
+   -------------------------------------------------------------------------- */
+.alert-box {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translate(-50%, -140%) scale(0.92);
+  z-index: 10;
+  width: 760px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.alert-box.show {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.alert-scroll {
+  background:
+    radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.08), transparent 60%),
+    linear-gradient(160deg, var(--parchment) 0%, var(--parchment-dark) 100%);
+  border: 4px solid var(--gold);
+  border-radius: 10px;
+  padding: 28px 40px;
+  text-align: center;
+  box-shadow: 0 12px 32px var(--shadow), inset 0 0 30px rgba(120, 80, 30, 0.25);
+  position: relative;
+}
+
+.alert-scroll::before,
+.alert-scroll::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 22px;
+  background: linear-gradient(180deg, var(--wood-light), var(--wood-dark));
+  border: 2px solid var(--espresso-dark);
+  border-radius: 6px;
+}
+
+.alert-scroll::before { left: -18px; }
+.alert-scroll::after { right: -18px; }
+
+.alert-heading {
+  margin: 0 0 8px;
+  font-family: var(--font-heading);
+  font-size: 34px;
+  color: var(--espresso);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.alert-body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.alert-body span {
+  color: #8a5a1e;
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------------------------
+   Quest board — bottom UI bar
+   -------------------------------------------------------------------------- */
+.quest-board {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: 160px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--wood-light) 0px,
+      var(--wood-dark) 3px,
+      var(--wood-light) 6px,
+      var(--wood-dark) 140px
+    );
+  border-top: 6px solid var(--espresso-dark);
+  box-shadow: 0 -10px 30px var(--shadow), inset 0 3px 0 rgba(255, 200, 120, 0.15);
+}
+
+.quest-board-inner {
+  height: 100%;
+  margin: 12px 32px;
+  padding: 14px 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  background:
+    radial-gradient(ellipse at top, rgba(255, 255, 255, 0.06), transparent 60%),
+    linear-gradient(180deg, var(--parchment) 0%, var(--parchment-dark) 100%);
+  border: 3px solid var(--gold);
+  border-radius: 10px;
+  box-shadow: inset 0 0 25px rgba(120, 80, 30, 0.3);
+}
+
+.quest-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.quest-label {
+  font-family: var(--font-title);
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+/* Timer */
+.timer-section {
+  flex: 0 0 auto;
+  min-width: 260px;
+  border-right: 2px solid rgba(90, 60, 30, 0.35);
+  padding-right: 28px;
+}
+
+.timer {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 52px;
+  color: var(--espresso);
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* Goal tracker */
+.goal-section {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#goal-text {
+  font-size: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goal-bar-track {
+  width: 100%;
+  height: 26px;
+  background: rgba(44, 30, 22, 0.35);
+  border: 2px solid var(--espresso);
+  border-radius: 13px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.goal-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #a8761f, var(--gold), var(--gold-bright));
+  box-shadow: 0 0 12px rgba(242, 199, 102, 0.7);
+  transition: width 0.8s ease-out;
+}
+
+/* Latest hero */
+.hero-section {
+  flex: 0 0 auto;
+  min-width: 320px;
+  max-width: 420px;
+  border-left: 2px solid rgba(90, 60, 30, 0.35);
+  padding-left: 28px;
+}
+
+.latest-hero {
+  font-family: var(--font-body);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

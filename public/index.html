@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Tavern Subathon Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="vignette"></div>
+
+  <!-- Asset placeholders: top right -->
+  <div class="asset-corner">
+    <div class="asset-box" id="qr-code-box">
+      <span>QR Code</span>
+    </div>
+    <div class="asset-box" id="extra-life-logo-box">
+      <span>Extra Life Logo</span>
+    </div>
+    <div class="asset-box" id="dayton-childrens-logo-box">
+      <span>Dayton Children's Logo</span>
+    </div>
+  </div>
+
+  <!-- New donation alert -->
+  <div class="alert-box" id="alert-box">
+    <div class="alert-scroll">
+      <p class="alert-heading">A New Hero Approaches!</p>
+      <p class="alert-body">
+        <span id="alert-name">Someone</span> donated
+        <span id="alert-amount">$0</span>!
+      </p>
+    </div>
+  </div>
+
+  <!-- Bottom UI bar: The Quest Board -->
+  <div class="quest-board">
+    <div class="quest-board-inner">
+
+      <div class="quest-section timer-section">
+        <span class="quest-label">Subathon Timer</span>
+        <span class="timer" id="timer">04:00:00</span>
+      </div>
+
+      <div class="quest-section goal-section">
+        <span class="quest-label" id="goal-text">$0 / $1000 &mdash; For Dayton Children's Hospital</span>
+        <div class="goal-bar-track">
+          <div class="goal-bar-fill" id="goal-bar-fill"></div>
+        </div>
+      </div>
+
+      <div class="quest-section hero-section">
+        <span class="quest-label">Latest Hero</span>
+        <span class="latest-hero" id="latest-hero">Awaiting a brave soul&hellip;</span>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

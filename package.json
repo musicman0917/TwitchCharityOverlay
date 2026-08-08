@@ -1,0 +1,14 @@
+{
+  "name": "twitch-charity-overlay",
+  "version": "1.0.0",
+  "description": "Extra Life charity subathon timer overlay for OBS, backed by Express + Socket.io",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
