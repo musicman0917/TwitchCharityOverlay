@@ -33,38 +33,49 @@ This overlay is meant to run on the same Windows streaming PC as the `nom-token-
 pm2 process (port 3010), as its own independent pm2 app on **port 3011**, in a sibling
 folder — it does not share any files or state with the Alerts app.
 
-1. On the streaming PC, clone (or `git pull` to update) this repo into:
-   ```
-   C:\Users\music\Documents\CharityOverlay\
-   ```
-2. Install dependencies:
-   ```powershell
-   cd C:\Users\music\Documents\CharityOverlay
-   npm install
-   ```
-3. Start it with pm2 using the included `ecosystem.config.js` (sets the app name and
-   port for you — no flags to remember):
-   ```powershell
-   pm2 start ecosystem.config.js
-   pm2 save
-   ```
-   This registers it alongside `nom-token-broker` as `nom-charity-overlay` on port `3011`.
-   Check both are running with:
-   ```powershell
-   pm2 list
-   ```
-4. Persisting pm2 across PC reboots on Windows: unlike Linux, `pm2 startup` isn't native
-   here. If you haven't already set this up for the Alerts app, install
-   [`pm2-windows-startup`](https://www.npmjs.com/package/pm2-windows-startup) once:
-   ```powershell
-   npm install -g pm2-windows-startup
-   pm2-startup install
-   pm2 save
-   ```
-   (If this is already configured for `nom-token-broker`, `nom-charity-overlay` will be
-   picked up automatically the next time you `pm2 save`.)
-5. This overlay is **localhost/LAN-only** — it is not added to the Cloudflare Tunnel, since
-   the OBS Browser Source loading it runs on the same PC.
+### First-time install
+
+The repo isn't on the streaming PC yet, so bootstrap it by downloading and running
+`deploy.ps1` directly from this branch (requires Git, Node.js, npm, and pm2 already on
+PATH — same prerequisites `nom-token-broker` already needs):
+
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/musicman0917/TwitchCharityOverlay/claude/twitch-charity-subathon-overlay-qtwc8a/deploy.ps1" -OutFile "$env:TEMP\deploy.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:TEMP\deploy.ps1"
+```
+
+This clones the repo into `C:\Users\music\Documents\CharityOverlay\`, runs `npm install`,
+and starts it with pm2 using `ecosystem.config.js` — registering it alongside
+`nom-token-broker` as **`nom-charity-overlay`** on port **`3011`**. Check both are running
+with `pm2 list`.
+
+### Updating later
+
+Once it's cloned, just re-run `deploy.ps1` from inside the checkout to pull the latest
+changes and restart the pm2 process:
+
+```powershell
+cd C:\Users\music\Documents\CharityOverlay
+.\deploy.ps1
+```
+
+### Persisting pm2 across reboots
+
+Unlike Linux, `pm2 startup` isn't native on Windows. If you haven't already set this up for
+the Alerts app, install [`pm2-windows-startup`](https://www.npmjs.com/package/pm2-windows-startup)
+once:
+
+```powershell
+npm install -g pm2-windows-startup
+pm2-startup install
+pm2 save
+```
+
+(If this is already configured for `nom-token-broker`, `nom-charity-overlay` will be picked
+up automatically the next time you `pm2 save`.)
+
+This overlay is **localhost/LAN-only** — it is not added to the Cloudflare Tunnel, since the
+OBS Browser Source loading it runs on the same PC.
 
 To stop/restart just this app:
 
