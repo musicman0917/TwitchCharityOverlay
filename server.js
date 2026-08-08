@@ -14,12 +14,14 @@ const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 15000);
 const STARTING_SECONDS = 4 * 60 * 60; // 04:00:00
 const SECONDS_PER_DOLLAR = 60; // +1 minute per $1 donated
 
-// NOM Alerts (nom-token-broker) theme sync — shares the Tavern/Purple theme
-// toggle that's controlled from admin.html on the Alerts overlay.
+// NOM Alerts (nom-token-broker) theme sync — shares whatever theme is
+// selected from admin.html on the Alerts overlay. NOM Alerts supports more
+// themes than this overlay has skins for (e.g. "disney"); the frontend only
+// has a dedicated look for "purple" and falls back to the Tavern default for
+// every other theme name, so the backend just relays whatever it's told.
 const NOM_ALERTS_BASE_URL = process.env.NOM_ALERTS_BASE_URL || 'http://localhost:3010';
 const NOM_ALERTS_SSE_URL = `${NOM_ALERTS_BASE_URL}/alerts-stream`;
 const NOM_ALERTS_THEME_STATE_URL = `${NOM_ALERTS_BASE_URL}/theme-state`;
-const VALID_THEMES = new Set(['tavern', 'purple']);
 const SSE_RECONNECT_DELAY_MS = 5000;
 
 const PARTICIPANT_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}`;
@@ -87,7 +89,7 @@ function serializeState() {
 }
 
 function setTheme(theme) {
-  if (!VALID_THEMES.has(theme) || theme === state.theme) return;
+  if (typeof theme !== 'string' || !theme || theme === state.theme) return;
   state.theme = theme;
   console.log(`[theme] switched to "${theme}"`);
   io.emit('themeUpdate', { theme: state.theme });
@@ -183,18 +185,18 @@ setInterval(pollExtraLife, POLL_INTERVAL_MS);
 // with an initial fetch from /theme-state so we start on the right theme
 // instead of always booting into "tavern".
 //
-// NOTE: the exact event name / payload shape nom-token-broker uses for theme
-// changes wasn't available when this was written, so handleSseMessage()
-// checks a few reasonable shapes. If the real broadcast looks different,
-// adjust handleSseMessage() and fetchInitialTheme() below to match it.
+// Confirmed contract (captured directly from nom-token-broker):
+//   GET /theme-state  -> {"theme":"<name>"}
+//   SSE /alerts-stream -> data: {"type":"theme-switch","theme":"<name>"}
+//   (no `event:` field — every message is a plain `data:` line with a
+//   `type` discriminator)
 // ---------------------------------------------------------------------------
 async function fetchInitialTheme() {
   try {
     const { data } = await nomAlertsClient.get(NOM_ALERTS_THEME_STATE_URL);
-    const theme = data && (data.theme || data.currentTheme);
-    if (typeof theme === 'string' && VALID_THEMES.has(theme)) {
-      state.theme = theme;
-      console.log(`[theme] initial theme from NOM Alerts: "${theme}"`);
+    if (data && typeof data.theme === 'string' && data.theme) {
+      state.theme = data.theme;
+      console.log(`[theme] initial theme from NOM Alerts: "${state.theme}"`);
     }
   } catch (err) {
     console.warn(
@@ -206,16 +208,10 @@ async function fetchInitialTheme() {
 function handleSseMessage(raw) {
   if (!raw.trim()) return;
 
-  let eventName = 'message';
-  const dataLines = [];
-
-  for (const line of raw.split('\n')) {
-    if (line.startsWith('event:')) {
-      eventName = line.slice('event:'.length).trim();
-    } else if (line.startsWith('data:')) {
-      dataLines.push(line.slice('data:'.length).trim());
-    }
-  }
+  const dataLines = raw
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice('data:'.length).trim());
 
   const rawData = dataLines.join('\n');
   if (!rawData) return;
@@ -227,13 +223,8 @@ function handleSseMessage(raw) {
     return; // not JSON, ignore
   }
 
-  const candidateTheme =
-    (eventName === 'theme' && payload.theme) ||
-    (payload.type === 'theme' && payload.theme) ||
-    payload.theme;
-
-  if (typeof candidateTheme === 'string' && VALID_THEMES.has(candidateTheme)) {
-    setTheme(candidateTheme);
+  if (payload.type === 'theme-switch') {
+    setTheme(payload.theme);
   }
 }
 
