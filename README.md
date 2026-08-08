@@ -154,12 +154,14 @@ Placeholder amounts/labels are already in there — replace them with your real 
 (e.g. `"Shave my head!"`, `"Extra hour on the timer"`) any time, then `pm2 restart
 nom-charity-overlay` (or re-run `deploy.ps1`) to pick up the change.
 
-Each milestone shows up in three places:
+Each milestone shows up in two places:
 
-- **Goal bar markers** — a small tick + `$amount` label at the milestone's position along the
-  donation goal bar, lit up gold once reached.
-- **Milestone track** (top-left panel) — a running checklist of every milestone and its label,
-  dimmed until reached.
+- **Goal bar markers** — a small gold tick at the milestone's position along the donation goal
+  bar, dim until reached.
+- **"Next Milestone" callout** — a compact pill that pops in just above the goal bar every ~90
+  seconds for ~8 seconds, showing whichever milestone hasn't been reached yet (amount + label).
+  It's purely time-based, not tied to donation events, and shows nothing once every milestone
+  has been reached. This replaced an earlier always-visible top-left panel to save screen space.
 - **Full-screen alert** — a bigger, longer-lasting popup (8s vs. the donation alert's 5s) fires
   center-screen the moment a milestone is crossed, showing the amount and reward label.
 

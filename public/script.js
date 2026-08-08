@@ -9,12 +9,15 @@ const alertBoxEl = document.getElementById('alert-box');
 const alertNameEl = document.getElementById('alert-name');
 const alertAmountEl = document.getElementById('alert-amount');
 
-const milestoneListEl = document.getElementById('milestone-list');
 const goalBarMarkersEl = document.getElementById('goal-bar-markers');
 
 const milestoneAlertEl = document.getElementById('milestone-alert');
 const milestoneAlertAmountEl = document.getElementById('milestone-alert-amount');
 const milestoneAlertLabelEl = document.getElementById('milestone-alert-label');
+
+const nextMilestoneEl = document.getElementById('next-milestone');
+const nextMilestoneAmountEl = document.getElementById('next-milestone-amount');
+const nextMilestoneTextEl = document.getElementById('next-milestone-text');
 
 let goal = 1000;
 let milestonesData = [];
@@ -60,7 +63,7 @@ function updateLatestHero(name, amount) {
 }
 
 // --------------------------------------------------------------------------
-// Milestones — goal bar markers + the always-visible track panel
+// Milestones — tick marks on the goal bar
 // --------------------------------------------------------------------------
 function renderMilestones() {
   goalBarMarkersEl.innerHTML = '';
@@ -77,28 +80,39 @@ function renderMilestones() {
     marker.appendChild(tick);
     goalBarMarkersEl.appendChild(marker);
   }
-
-  milestoneListEl.innerHTML = '';
-  for (const m of milestonesData) {
-    const item = document.createElement('div');
-    item.className = `milestone-item${m.reached ? ' reached' : ''}`;
-
-    const check = document.createElement('span');
-    check.className = 'milestone-item-check';
-    check.textContent = m.reached ? '✓' : '○';
-
-    const amountEl = document.createElement('span');
-    amountEl.className = 'milestone-item-amount';
-    amountEl.textContent = formatMoney(m.amount);
-
-    const labelEl = document.createElement('span');
-    labelEl.className = 'milestone-item-label';
-    labelEl.textContent = m.label;
-
-    item.append(check, amountEl, labelEl);
-    milestoneListEl.appendChild(item);
-  }
 }
+
+// --------------------------------------------------------------------------
+// "Next Milestone" callout — pops in near the goal bar every ~90s for ~8s,
+// showing whichever milestone hasn't been reached yet. Purely time-based
+// (not tied to donation events), and simply does nothing if every
+// milestone has already been reached.
+// --------------------------------------------------------------------------
+const NEXT_MILESTONE_INITIAL_DELAY_MS = 5000;
+const NEXT_MILESTONE_INTERVAL_MS = 90000;
+const NEXT_MILESTONE_VISIBLE_MS = 8000;
+
+function getNextMilestone() {
+  return milestonesData.find((m) => !m.reached) || null;
+}
+
+function showNextMilestoneCallout() {
+  const next = getNextMilestone();
+  if (!next) return; // every milestone already reached — nothing to tease
+
+  nextMilestoneAmountEl.textContent = formatMoney(next.amount);
+  nextMilestoneTextEl.textContent = next.label;
+  nextMilestoneEl.classList.add('show');
+
+  setTimeout(() => {
+    nextMilestoneEl.classList.remove('show');
+  }, NEXT_MILESTONE_VISIBLE_MS);
+}
+
+setTimeout(() => {
+  showNextMilestoneCallout();
+  setInterval(showNextMilestoneCallout, NEXT_MILESTONE_INTERVAL_MS);
+}, NEXT_MILESTONE_INITIAL_DELAY_MS);
 
 // --------------------------------------------------------------------------
 // Milestone alert queue — bigger, full-screen, stays longer than a normal
