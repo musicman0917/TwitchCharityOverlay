@@ -34,10 +34,13 @@ Write-Host "Installing dependencies..."
 npm install
 
 Write-Host "Starting/restarting with pm2..."
-$existing = pm2 jlist | ConvertFrom-Json | Where-Object { $_.name -eq "nom-charity-overlay" }
-if ($existing) {
-    pm2 restart nom-charity-overlay
-} else {
+# Avoid `pm2 jlist | ConvertFrom-Json` here -- on Windows pm2 dumps the full
+# process environment into jlist, which can contain keys that differ only by
+# case (e.g. USERNAME/username), and ConvertFrom-Json throws on those.
+# Just try a restart first and fall back to a fresh start if it fails.
+pm2 restart nom-charity-overlay 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "No existing nom-charity-overlay process -- starting fresh..."
     pm2 start ecosystem.config.js
 }
 pm2 save
