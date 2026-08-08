@@ -16,7 +16,13 @@ const PORT = process.env.PORT || 3011;
 const PARTICIPANT_ID = process.env.PARTICIPANT_ID || '567118';
 const GOAL_AMOUNT = Number(process.env.GOAL_AMOUNT || 1000);
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 15000);
-const STARTING_SECONDS = 4 * 60 * 60; // 04:00:00
+// Default base timer duration, in hours -- how long the countdown starts at
+// before any donations add time. Not final until the base is confirmed;
+// change STARTING_HOURS any time before the first-ever boot, or adjust the
+// base later via the admin portal's "Base Timer Duration" control (which
+// takes over from this default once set).
+const DEFAULT_STARTING_HOURS = Number(process.env.STARTING_HOURS || 4);
+const DEFAULT_STARTING_SECONDS = DEFAULT_STARTING_HOURS * 60 * 60;
 const SECONDS_PER_DOLLAR = 60; // +1 minute per $1 donated
 
 // NOM Alerts (nom-token-broker) theme sync — shares whatever theme is
@@ -44,12 +50,12 @@ const DONATIONS_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}
 
 const donorDriveClient = axios.create({
   timeout: 10000,
-  headers: { 'User-Agent': 'TwitchCharityOverlay/1.0 (OBS Subathon Timer)' },
+  headers: { 'User-Agent': 'TwitchCharityOverlay/1.0 (OBS Donothon Timer)' },
 });
 
 const nomAlertsClient = axios.create({
   timeout: 5000,
-  headers: { 'User-Agent': 'TwitchCharityOverlay/1.0 (OBS Subathon Timer)' },
+  headers: { 'User-Agent': 'TwitchCharityOverlay/1.0 (OBS Donothon Timer)' },
 });
 
 // ---------------------------------------------------------------------------
@@ -135,7 +141,14 @@ const persisted = loadPersistedState();
 // In-memory state
 // ---------------------------------------------------------------------------
 const state = {
-  currentTimer: typeof persisted.currentTimer === 'number' ? persisted.currentTimer : STARTING_SECONDS,
+  // The base/starting duration, in seconds -- what the countdown starts at
+  // before donations add time, and what "Reset" returns it to. Defaults
+  // from STARTING_HOURS on a fresh install; adjustable afterward via the
+  // admin portal without needing a code change or restart.
+  baseSeconds: typeof persisted.baseSeconds === 'number' ? persisted.baseSeconds : DEFAULT_STARTING_SECONDS,
+  currentTimer: typeof persisted.currentTimer === 'number'
+    ? persisted.currentTimer
+    : (typeof persisted.baseSeconds === 'number' ? persisted.baseSeconds : DEFAULT_STARTING_SECONDS),
   totalRaised: typeof persisted.totalRaised === 'number' ? persisted.totalRaised : 0,
   goal: GOAL_AMOUNT,
   latestDonorName: persisted.latestDonorName ?? null,
@@ -156,6 +169,7 @@ const state = {
 
 function saveState() {
   const snapshot = {
+    baseSeconds: state.baseSeconds,
     currentTimer: state.currentTimer,
     totalRaised: state.totalRaised,
     latestDonorName: state.latestDonorName,
@@ -200,6 +214,7 @@ io.on('connection', (socket) => {
 
 function serializeState() {
   return {
+    baseSeconds: state.baseSeconds,
     currentTimer: state.currentTimer,
     totalRaised: state.totalRaised,
     goal: state.goal,
@@ -260,7 +275,7 @@ function checkMilestones() {
 }
 
 // ---------------------------------------------------------------------------
-// Subathon timer tick (broadcast every second)
+// Donothon timer tick (broadcast every second)
 // ---------------------------------------------------------------------------
 setInterval(() => {
   // Scheduled auto-resume — checked every tick rather than a single
@@ -536,10 +551,26 @@ app.post('/admin/timer/adjust', requireAdminAuth, (req, res) => {
 });
 
 app.post('/admin/timer/reset', requireAdminAuth, (req, res) => {
-  state.currentTimer = STARTING_SECONDS;
+  state.currentTimer = state.baseSeconds;
   io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
   saveState();
   res.json({ ok: true, currentTimer: state.currentTimer });
+});
+
+// Changes what the countdown's base duration is (what "Reset" returns it
+// to). Does NOT touch the currently running currentTimer -- donation time
+// already added shouldn't be wiped out just because the base changed;
+// click Reset afterward if the new base should apply immediately.
+app.post('/admin/timer/base', requireAdminAuth, (req, res) => {
+  const hours = Number(req.body && req.body.hours);
+  if (!Number.isFinite(hours) || hours <= 0) {
+    return res.status(400).json({ error: 'hours must be a positive number' });
+  }
+  state.baseSeconds = Math.round(hours * 3600);
+  console.log(`[timer] base duration set to ${hours}h (${state.baseSeconds}s)`);
+  io.emit('baseUpdate', { baseSeconds: state.baseSeconds });
+  saveState();
+  res.json({ ok: true, baseSeconds: state.baseSeconds });
 });
 
 app.post('/admin/timer/schedule', requireAdminAuth, (req, res) => {

@@ -205,7 +205,7 @@
     <div class="top-bar">
       <div>
         <h1>Charity Overlay Admin</h1>
-        <p class="subtitle">Dayton Children's Hospital subathon overlay controls</p>
+        <p class="subtitle">Dayton Children's Hospital donothon overlay controls</p>
       </div>
       <button class="secondary" id="logout-btn">Log Out</button>
     </div>
@@ -216,14 +216,29 @@
       <div class="status-line">Total raised: <strong id="status-total">$0</strong></div>
       <div class="status-line">Theme: <strong id="status-theme">—</strong></div>
       <div class="status-line">Scheduled auto-resume: <strong id="status-schedule">None</strong></div>
+      <div class="status-line">Base timer duration: <strong id="status-base">--:--:--</strong></div>
     </div>
 
     <div class="panel">
       <h2>Timer Controls</h2>
+
       <div class="row">
+        <div>
+          <label for="base-hours">Base timer duration (hours) — what "Reset" returns the countdown to</label>
+          <input type="number" id="base-hours" step="0.5" min="0.5" placeholder="e.g. 4 or 8" />
+        </div>
+        <div style="flex: 0 0 auto;"><button id="base-save-btn" class="secondary">Save Base Duration</button></div>
+      </div>
+      <p class="subtitle" style="margin: 0 0 14px;">
+        Doesn't touch the currently running countdown — click Reset afterward if you want the
+        new base to apply right away.
+      </p>
+      <div class="msg" id="base-msg" style="margin-bottom: 14px;"></div>
+
+      <div class="row" style="border-top: 1px solid var(--panel-border); padding-top: 14px;">
         <div><button id="pause-btn">Pause</button></div>
         <div><button id="resume-btn" class="secondary">Resume</button></div>
-        <div><button id="reset-btn" class="danger">Reset to 04:00:00</button></div>
+        <div><button id="reset-btn" class="danger">Reset</button></div>
       </div>
       <div class="row">
         <div><button data-adjust="-600" class="secondary">-10 min</button></div>
@@ -393,11 +408,21 @@
         : 'None';
     }
 
+    function renderBaseStatus(baseSeconds) {
+      document.getElementById('status-base').textContent = formatTimer(baseSeconds);
+      const input = document.getElementById('base-hours');
+      if (document.activeElement !== input) {
+        input.value = baseSeconds / 3600;
+      }
+      document.getElementById('reset-btn').textContent = `Reset to ${formatTimer(baseSeconds)}`;
+    }
+
     function renderStatus(state) {
       document.getElementById('status-timer').textContent = formatTimer(state.currentTimer);
       document.getElementById('status-total').textContent = formatMoney(state.totalRaised);
       document.getElementById('status-theme').textContent = state.theme;
       renderScheduleStatus(state.scheduledStartAt);
+      renderBaseStatus(state.baseSeconds);
       const pill = document.getElementById('status-pill');
       if (state.timerPaused) {
         pill.textContent = 'PAUSED';
@@ -437,6 +462,9 @@
     socket.on('themeUpdate', (data) => {
       document.getElementById('status-theme').textContent = data.theme;
     });
+    socket.on('baseUpdate', (data) => {
+      renderBaseStatus(data.baseSeconds);
+    });
     socket.on('milestonesUpdate', (data) => {
       renderMilestoneRows(data.milestones);
     });
@@ -462,9 +490,34 @@
     });
 
     document.getElementById('reset-btn').addEventListener('click', async () => {
-      if (!confirm('Reset the timer to 04:00:00? This cannot be undone.')) return;
+      const label = document.getElementById('status-base').textContent;
+      if (!confirm(`Reset the timer to ${label}? This cannot be undone.`)) return;
       const res = await apiFetch('/admin/timer/reset', { method: 'POST' });
-      setTimerMsg(res.ok ? 'Timer reset to 04:00:00.' : 'Failed to reset timer.', res.ok);
+      setTimerMsg(res.ok ? `Timer reset to ${label}.` : 'Failed to reset timer.', res.ok);
+    });
+
+    document.getElementById('base-save-btn').addEventListener('click', async () => {
+      const hours = Number(document.getElementById('base-hours').value);
+      const msgEl = document.getElementById('base-msg');
+      if (!Number.isFinite(hours) || hours <= 0) {
+        msgEl.textContent = 'Enter a positive number of hours.';
+        msgEl.className = 'msg err';
+        return;
+      }
+      const res = await apiFetch('/admin/timer/base', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hours }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        renderBaseStatus(data.baseSeconds);
+        msgEl.textContent = `Base duration set to ${formatTimer(data.baseSeconds)}.`;
+        msgEl.className = 'msg ok';
+      } else {
+        msgEl.textContent = 'Failed to set base duration.';
+        msgEl.className = 'msg err';
+      }
     });
 
     document.querySelectorAll('button[data-adjust]').forEach((btn) => {

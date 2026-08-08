@@ -1,10 +1,10 @@
 # TwitchCharityOverlay
 
-A cozy fantasy-tavern themed Twitch subathon overlay for **Dayton Children's Hospital**,
+A cozy fantasy-tavern themed Twitch donothon overlay for **Dayton Children's Hospital**,
 powered by an [Extra Life](https://www.extra-life.org/) / DonorDrive donation feed.
 
 - **Backend**: Node.js, Express, Socket.io, Axios — polls the Extra Life API every 15s,
-  tracks a subathon countdown timer, and pushes live updates to the browser overlay.
+  tracks a donothon countdown timer, and pushes live updates to the browser overlay.
 - **Frontend**: static HTML/CSS/vanilla JS overlay meant to be added as an OBS Browser Source
   (1920x1080), showing a countdown timer, donation goal bar, latest-donor callout, and an
   animated "new hero" alert popup.
@@ -32,6 +32,7 @@ The server reads optional environment variables (all have sensible defaults exce
 | `POLL_INTERVAL_MS`    | `15000`                  | How often to poll the Extra Life API (ms)            |
 | `NOM_ALERTS_BASE_URL` | `http://localhost:3010`  | Base URL of the `nom-token-broker` server, used for theme sync (see below) |
 | `ADMIN_PASSWORD`      | *(none)*                 | Password for the admin portal (`/admin.html`) — logins are rejected until this is set |
+| `STARTING_HOURS`      | `4`                      | Base countdown duration in hours — only applies on the very first-ever boot (no `.overlay-state.json` yet); change it later via the admin portal instead (see below) |
 
 ## Deployment (streaming PC — alongside NOM Alerts)
 
@@ -101,9 +102,14 @@ pm2 logs nom-charity-overlay
 5. Refreshing the browser source is safe at any time: on connect, the server immediately
    sends the current timer, total raised, and latest donor so nothing resets.
 
-## How the subathon timer works
+## How the donothon timer works
 
-- The timer starts at **04:00:00**. Every dollar donated adds **60 seconds** to it.
+- The timer starts at a **base duration** (default 4 hours — set `STARTING_HOURS` before the
+  first-ever boot, or change it later via the admin portal's "Base Timer Duration" control,
+  which doesn't require picking a code default up front if you haven't decided yet). Every
+  dollar donated adds **60 seconds** to it. Changing the base later doesn't touch the
+  currently running countdown — it only changes what "Reset" returns it to; click Reset
+  afterward if you want the new base to apply immediately.
 - The server polls the Extra Life donations endpoint every 15 seconds. For every **new**
   donation it detects, it adds time and fires a `newDonation` alert on the overlay.
 - Donations that already existed the first time the server successfully polls (e.g. donations
@@ -232,11 +238,11 @@ exposure. Don't port-forward 3011 or add it to the tunnel.
 
 What it can do:
 
-- **Timer controls** — pause/resume the countdown, nudge it by ±1/±10 minutes or a custom
-  number of seconds, reset to 04:00:00, or schedule an exact date/time for it to auto-resume
-  (handy for a stream announced weeks out — see "How the subathon timer works" above). A
-  paused timer shows a "⏸ PAUSED" indicator on the overlay itself so it's clear on-stream
-  that it's intentional, not frozen/broken.
+- **Timer controls** — set the base timer duration (hours), pause/resume the countdown, nudge
+  it by ±1/±10 minutes or a custom number of seconds, reset to the base duration, or schedule
+  an exact date/time for it to auto-resume (handy for a stream announced weeks out — see "How
+  the donothon timer works" above). A paused timer shows a "⏸ PAUSED" indicator on the overlay
+  itself so it's clear on-stream that it's intentional, not frozen/broken.
 - **Test alerts** — fire a donation alert (any name/amount, exercises the tier system) or a
   milestone alert (any amount/label) on demand. These are visual/audio previews only — they
   never touch the real timer, `totalRaised`, or the "Latest Hero" display, so testing mid-stream

@@ -1,7 +1,7 @@
 {
   "name": "twitch-charity-overlay",
   "version": "1.0.0",
-  "description": "Extra Life charity subathon timer overlay for OBS, backed by Express + Socket.io",
+  "description": "Extra Life charity donothon timer overlay for OBS, backed by Express + Socket.io",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
