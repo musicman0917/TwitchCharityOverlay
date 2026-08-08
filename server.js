@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const http = require('http');
@@ -38,6 +39,29 @@ const nomAlertsClient = axios.create({
 });
 
 // ---------------------------------------------------------------------------
+// Donation milestones — placeholder amounts/labels, edit milestones.json to
+// set the real ones. Sorted ascending so goal-bar markers and the milestone
+// track render in order.
+// ---------------------------------------------------------------------------
+const MILESTONES_FILE = path.join(__dirname, 'milestones.json');
+
+function loadMilestones() {
+  try {
+    const raw = fs.readFileSync(MILESTONES_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('milestones.json must be a JSON array');
+    return parsed
+      .filter((m) => typeof m.amount === 'number' && typeof m.label === 'string')
+      .sort((a, b) => a.amount - b.amount);
+  } catch (err) {
+    console.warn(`[milestones] could not load milestones.json (${err.message}); no milestones configured`);
+    return [];
+  }
+}
+
+const milestones = loadMilestones();
+
+// ---------------------------------------------------------------------------
 // In-memory state
 // ---------------------------------------------------------------------------
 const state = {
@@ -49,6 +73,8 @@ const state = {
   processedDonationIds: new Set(),
   hasBaseline: false, // becomes true after the first successful donations poll
   theme: 'tavern',
+  reachedMilestones: new Set(), // amounts already crossed
+  milestonesChecked: false, // becomes true after the first milestone check
 };
 
 // ---------------------------------------------------------------------------
@@ -85,7 +111,16 @@ function serializeState() {
     latestDonorName: state.latestDonorName,
     latestDonorAmount: state.latestDonorAmount,
     theme: state.theme,
+    milestones: serializeMilestones(),
   };
+}
+
+function serializeMilestones() {
+  return milestones.map((m) => ({
+    amount: m.amount,
+    label: m.label,
+    reached: state.reachedMilestones.has(m.amount),
+  }));
 }
 
 function setTheme(theme) {
@@ -93,6 +128,38 @@ function setTheme(theme) {
   state.theme = theme;
   console.log(`[theme] switched to "${theme}"`);
   io.emit('themeUpdate', { theme: state.theme });
+}
+
+// Checks totalRaised against the configured milestones and fires alerts for
+// any newly-crossed ones. On the very first check (server just started, and
+// totalRaised may already be well past some milestones from before the
+// overlay was running), those get marked reached silently instead of firing
+// a pile of alerts on startup.
+function checkMilestones() {
+  const isFirstCheck = !state.milestonesChecked;
+  state.milestonesChecked = true;
+
+  const newlyReached = [];
+  for (const m of milestones) {
+    if (state.totalRaised >= m.amount && !state.reachedMilestones.has(m.amount)) {
+      state.reachedMilestones.add(m.amount);
+      newlyReached.push(m);
+    }
+  }
+  if (!newlyReached.length) return;
+
+  if (isFirstCheck) {
+    console.log(
+      `[milestones] baseline: $${state.totalRaised} already covers ${newlyReached.map((m) => `$${m.amount}`).join(', ')}`
+    );
+    return;
+  }
+
+  for (const m of newlyReached) {
+    console.log(`[milestone] reached $${m.amount}: ${m.label}`);
+    io.emit('milestoneReached', { amount: m.amount, label: m.label });
+  }
+  io.emit('milestonesUpdate', { milestones: serializeMilestones() });
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +182,7 @@ async function pollTotalRaised() {
     if (typeof data.sumDonations === 'number') {
       state.totalRaised = data.sumDonations;
       io.emit('totalUpdate', { totalRaised: state.totalRaised, goal: state.goal });
+      checkMilestones();
     }
   } catch (err) {
     console.error('[poll] failed to fetch participant total:', err.message);

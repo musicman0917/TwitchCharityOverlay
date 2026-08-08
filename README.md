@@ -136,6 +136,42 @@ How it's wired up:
 If `NOM_ALERTS_BASE_URL` points somewhere unreachable, or you don't want theme sync at all,
 the overlay just stays on Tavern — no configuration needed to disable it.
 
+## Donation milestones
+
+Milestones are configured in `milestones.json` (repo root) — edit this file whenever you want
+to change the amounts or reward text, no code changes needed:
+
+```json
+[
+  { "amount": 250, "label": "Milestone reward TBD" },
+  { "amount": 500, "label": "Milestone reward TBD" },
+  { "amount": 750, "label": "Milestone reward TBD" },
+  { "amount": 1000, "label": "Goal Reached!" }
+]
+```
+
+Placeholder amounts/labels are already in there — replace them with your real milestones
+(e.g. `"Shave my head!"`, `"Extra hour on the timer"`) any time, then `pm2 restart
+nom-charity-overlay` (or re-run `deploy.ps1`) to pick up the change.
+
+Each milestone shows up in three places:
+
+- **Goal bar markers** — a small tick + `$amount` label at the milestone's position along the
+  donation goal bar, lit up gold once reached.
+- **Milestone track** (top-left panel) — a running checklist of every milestone and its label,
+  dimmed until reached.
+- **Full-screen alert** — a bigger, longer-lasting popup (8s vs. the donation alert's 5s) fires
+  center-screen the moment a milestone is crossed, showing the amount and reward label.
+
+Milestones are tracked against `totalRaised` (the same Extra Life total used for the goal bar),
+checked every time it's polled (every `POLL_INTERVAL_MS`). If the server restarts mid-stream
+with `totalRaised` already past some milestones, those are marked reached silently on the first
+check — only milestones crossed *after* that get the full-screen alert, so a restart doesn't
+replay a pile of alerts for progress that already happened.
+
+Milestone amounts are independent of `GOAL_AMOUNT` — the goal bar always scales to
+`GOAL_AMOUNT`, so a milestone set above it will show its marker pinned at the right edge.
+
 ## Asset placeholders
 
 The top-right corner of the overlay has three dashed-border placeholder boxes for "QR Code",

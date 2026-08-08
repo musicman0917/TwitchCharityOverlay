@@ -36,6 +36,21 @@
     </div>
   </div>
 
+  <!-- Milestone track: top-left, always visible -->
+  <div class="milestone-track" id="milestone-track">
+    <div class="milestone-track-title">Milestones</div>
+    <div class="milestone-list" id="milestone-list"></div>
+  </div>
+
+  <!-- Full-screen milestone alert (bigger/flashier than the donation alert) -->
+  <div class="milestone-alert" id="milestone-alert">
+    <div class="milestone-alert-inner">
+      <p class="milestone-alert-heading">Milestone Reached!</p>
+      <p class="milestone-alert-amount" id="milestone-alert-amount">$0</p>
+      <p class="milestone-alert-label" id="milestone-alert-label"></p>
+    </div>
+  </div>
+
   <!-- Bottom UI bar: The Quest Board -->
   <div class="quest-board">
     <div class="quest-board-inner">
@@ -47,8 +62,11 @@
 
       <div class="quest-section goal-section">
         <span class="quest-label" id="goal-text">$0 / $1000 &mdash; For Dayton Children's Hospital</span>
-        <div class="goal-bar-track">
-          <div class="goal-bar-fill" id="goal-bar-fill"></div>
+        <div class="goal-bar-wrap">
+          <div class="goal-bar-track">
+            <div class="goal-bar-fill" id="goal-bar-fill"></div>
+          </div>
+          <div class="goal-bar-markers" id="goal-bar-markers"></div>
         </div>
       </div>
 
