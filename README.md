@@ -103,16 +103,29 @@ pm2 logs nom-charity-overlay
 
 ## How the subathon timer works
 
-- The timer starts at **04:00:00** when the server process starts and counts down every second.
+- The timer starts at **04:00:00**. Every dollar donated adds **60 seconds** to it.
 - The server polls the Extra Life donations endpoint every 15 seconds. For every **new**
-  donation it detects, it adds **60 seconds per $1 donated** to the timer and fires a
-  `newDonation` alert on the overlay.
+  donation it detects, it adds time and fires a `newDonation` alert on the overlay.
 - Donations that already existed the first time the server successfully polls (e.g. donations
-  made before you started the overlay) are recorded as a baseline and do **not** add time —
-  only donations that arrive *after* the server starts will extend the clock.
-- State (timer, total raised, processed donation IDs) lives in memory only and resets if the
-  server process restarts — pm2 keeps the process alive so this should only happen on
-  intentional restarts or crashes.
+  made before you first started the overlay) are recorded as a baseline and do **not** add
+  time — only donations that arrive *after* that first poll extend the clock.
+- **State persists across restarts.** `currentTimer`, `totalRaised`, processed donation IDs,
+  reached milestones, and the pause/schedule state all get written to `.overlay-state.json`
+  (gitignored — it's runtime data, not source) after every meaningful change, plus every 10s
+  as a safety net for the ticking countdown. A pm2 restart, crash, or PC reboot during a
+  multi-week lead-up to a stream picks up right where it left off instead of losing donation
+  time or re-baselining and silently swallowing donations that arrived while it was down.
+- **Fresh installs default to paused.** `timerPaused` starts `true` when there's no
+  `.overlay-state.json` yet, so the countdown never starts ticking on its own the moment you
+  first deploy — donations still add time and the goal bar still updates while paused, only
+  the countdown itself is frozen. Once resumed (manually via the admin portal, or by a
+  schedule — see below), that running state is what persists across future restarts, so a
+  restart *during* the actual stream won't re-pause it.
+- **Scheduled auto-resume**: instead of remembering to click "Resume" at the exact moment the
+  stream starts, set a date/time in the admin portal's Timer Controls panel and the server
+  will flip `timerPaused` to `false` automatically at that moment (checked every tick, so it
+  works correctly no matter how far in the future it is — a plain `setTimeout` can't handle
+  delays longer than ~24.8 days). Manually resuming at any point cancels a pending schedule.
 
 ## Donation alert tiers + sound
 
@@ -220,8 +233,10 @@ exposure. Don't port-forward 3011 or add it to the tunnel.
 What it can do:
 
 - **Timer controls** — pause/resume the countdown, nudge it by ±1/±10 minutes or a custom
-  number of seconds, or reset to 04:00:00. A paused timer shows a "⏸ PAUSED" indicator on
-  the overlay itself so it's clear on-stream that it's intentional, not frozen/broken.
+  number of seconds, reset to 04:00:00, or schedule an exact date/time for it to auto-resume
+  (handy for a stream announced weeks out — see "How the subathon timer works" above). A
+  paused timer shows a "⏸ PAUSED" indicator on the overlay itself so it's clear on-stream
+  that it's intentional, not frozen/broken.
 - **Test alerts** — fire a donation alert (any name/amount, exercises the tier system) or a
   milestone alert (any amount/label) on demand. These are visual/audio previews only — they
   never touch the real timer, `totalRaised`, or the "Latest Hero" display, so testing mid-stream

@@ -215,6 +215,7 @@
       <div class="status-line">Timer: <strong id="status-timer">--:--:--</strong> <span class="pill" id="status-pill">—</span></div>
       <div class="status-line">Total raised: <strong id="status-total">$0</strong></div>
       <div class="status-line">Theme: <strong id="status-theme">—</strong></div>
+      <div class="status-line">Scheduled auto-resume: <strong id="status-schedule">None</strong></div>
     </div>
 
     <div class="panel">
@@ -238,6 +239,21 @@
         <div style="flex: 0 0 auto;"><button id="custom-adjust-btn" class="secondary">Apply</button></div>
       </div>
       <div class="msg" id="timer-msg"></div>
+
+      <div class="row" style="margin-top: 16px; border-top: 1px solid var(--panel-border); padding-top: 14px;">
+        <div>
+          <label for="schedule-datetime">Auto-resume at (your local time)</label>
+          <input type="datetime-local" id="schedule-datetime" />
+        </div>
+        <div style="flex: 0 0 auto;"><button id="schedule-btn" class="secondary">Schedule Auto-Resume</button></div>
+        <div style="flex: 0 0 auto;"><button id="schedule-clear-btn" class="secondary">Clear Schedule</button></div>
+      </div>
+      <p class="subtitle" style="margin: 0;">
+        Pauses the timer now (if not already) and automatically resumes it at the exact
+        date/time above — useful for a countdown that sits up for days before the stream
+        without ticking down early. Resuming manually at any point cancels the schedule.
+      </p>
+      <div class="msg" id="schedule-msg"></div>
     </div>
 
     <div class="panel">
@@ -370,10 +386,18 @@
       return `$${Number(amount).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
     }
 
+    function renderScheduleStatus(scheduledStartAt) {
+      const el = document.getElementById('status-schedule');
+      el.textContent = scheduledStartAt
+        ? new Date(scheduledStartAt).toLocaleString()
+        : 'None';
+    }
+
     function renderStatus(state) {
       document.getElementById('status-timer').textContent = formatTimer(state.currentTimer);
       document.getElementById('status-total').textContent = formatMoney(state.totalRaised);
       document.getElementById('status-theme').textContent = state.theme;
+      renderScheduleStatus(state.scheduledStartAt);
       const pill = document.getElementById('status-pill');
       if (state.timerPaused) {
         pill.textContent = 'PAUSED';
@@ -415,6 +439,9 @@
     });
     socket.on('milestonesUpdate', (data) => {
       renderMilestoneRows(data.milestones);
+    });
+    socket.on('scheduleUpdate', (data) => {
+      renderScheduleStatus(data.scheduledStartAt);
     });
 
     // -- Timer controls --
@@ -464,6 +491,39 @@
         body: JSON.stringify({ seconds: val }),
       });
       setTimerMsg(res.ok ? `Adjusted by ${val > 0 ? '+' : ''}${val}s.` : 'Failed to adjust timer.', res.ok);
+    });
+
+    document.getElementById('schedule-btn').addEventListener('click', async () => {
+      const val = document.getElementById('schedule-datetime').value;
+      const msgEl = document.getElementById('schedule-msg');
+      if (!val) {
+        msgEl.textContent = 'Pick a date/time first.';
+        msgEl.className = 'msg err';
+        return;
+      }
+      const iso = new Date(val).toISOString();
+      const res = await apiFetch('/admin/timer/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startAt: iso }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        renderScheduleStatus(data.scheduledStartAt);
+        msgEl.textContent = `Scheduled to auto-resume at ${new Date(data.scheduledStartAt).toLocaleString()}.`;
+        msgEl.className = 'msg ok';
+      } else {
+        msgEl.textContent = 'Failed to schedule auto-resume.';
+        msgEl.className = 'msg err';
+      }
+    });
+
+    document.getElementById('schedule-clear-btn').addEventListener('click', async () => {
+      const msgEl = document.getElementById('schedule-msg');
+      const res = await apiFetch('/admin/timer/schedule/clear', { method: 'POST' });
+      renderScheduleStatus(null);
+      msgEl.textContent = res.ok ? 'Schedule cleared.' : 'Failed to clear schedule.';
+      msgEl.className = `msg ${res.ok ? 'ok' : 'err'}`;
     });
 
     // -- Test alerts --

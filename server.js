@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 const crypto = require('crypto');
 const fs = require('fs');
@@ -96,6 +96,7 @@ function saveMilestones(newMilestones) {
 
   console.log(`[milestones] admin updated milestones.json (${milestones.length} milestone(s))`);
   io.emit('milestonesUpdate', { milestones: serializeMilestones() });
+  saveState();
   return milestones;
 }
 
@@ -112,21 +113,62 @@ function loadDonationTiers() {
 }
 
 // ---------------------------------------------------------------------------
+// Persisted runtime state — this overlay is meant to run unattended for
+// potentially weeks before a scheduled stream (donations should keep
+// accumulating timer time the whole way), so currentTimer/totalRaised/etc.
+// survive a pm2 restart instead of resetting to the fresh-install defaults.
+// ---------------------------------------------------------------------------
+const STATE_FILE = path.join(__dirname, '.overlay-state.json');
+
+function loadPersistedState() {
+  try {
+    const raw = fs.readFileSync(STATE_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return {}; // no persisted state yet (fresh install) — use defaults
+  }
+}
+
+const persisted = loadPersistedState();
+
+// ---------------------------------------------------------------------------
 // In-memory state
 // ---------------------------------------------------------------------------
 const state = {
-  currentTimer: STARTING_SECONDS,
-  totalRaised: 0,
+  currentTimer: typeof persisted.currentTimer === 'number' ? persisted.currentTimer : STARTING_SECONDS,
+  totalRaised: typeof persisted.totalRaised === 'number' ? persisted.totalRaised : 0,
   goal: GOAL_AMOUNT,
-  latestDonorName: null,
-  latestDonorAmount: null,
-  processedDonationIds: new Set(),
-  hasBaseline: false, // becomes true after the first successful donations poll
+  latestDonorName: persisted.latestDonorName ?? null,
+  latestDonorAmount: persisted.latestDonorAmount ?? null,
+  processedDonationIds: new Set(persisted.processedDonationIds || []),
+  hasBaseline: persisted.hasBaseline ?? false, // becomes true after the first successful donations poll
   theme: 'tavern',
-  reachedMilestones: new Set(), // amounts already crossed
-  milestonesChecked: false, // becomes true after the first milestone check
-  timerPaused: false,
+  reachedMilestones: new Set(persisted.reachedMilestones || []), // amounts already crossed
+  milestonesChecked: persisted.milestonesChecked ?? false, // becomes true after the first milestone check
+  // Fresh installs default to PAUSED -- the overlay is meant to sit up for
+  // days/weeks accumulating donation time before the actual stream, and
+  // should never start ticking down on its own. Once resumed (manually or
+  // via a schedule), the persisted value keeps that running state across
+  // any later restart, including ones that happen mid-stream.
+  timerPaused: persisted.timerPaused ?? true,
+  scheduledStartAt: persisted.scheduledStartAt ?? null, // ISO string or null
 };
+
+function saveState() {
+  const snapshot = {
+    currentTimer: state.currentTimer,
+    totalRaised: state.totalRaised,
+    latestDonorName: state.latestDonorName,
+    latestDonorAmount: state.latestDonorAmount,
+    processedDonationIds: [...state.processedDonationIds],
+    hasBaseline: state.hasBaseline,
+    reachedMilestones: [...state.reachedMilestones],
+    milestonesChecked: state.milestonesChecked,
+    timerPaused: state.timerPaused,
+    scheduledStartAt: state.scheduledStartAt,
+  };
+  fs.writeFileSync(STATE_FILE, JSON.stringify(snapshot, null, 2));
+}
 
 // ---------------------------------------------------------------------------
 // App / server setup
@@ -166,6 +208,7 @@ function serializeState() {
     theme: state.theme,
     milestones: serializeMilestones(),
     timerPaused: state.timerPaused,
+    scheduledStartAt: state.scheduledStartAt,
   };
 }
 
@@ -220,12 +263,30 @@ function checkMilestones() {
 // Subathon timer tick (broadcast every second)
 // ---------------------------------------------------------------------------
 setInterval(() => {
+  // Scheduled auto-resume — checked every tick rather than a single
+  // setTimeout since the target can be weeks away, well past Node's
+  // ~24.8 day max setTimeout delay. Fires once: clearing scheduledStartAt
+  // immediately means a later manual pause (e.g. a stream break) can't
+  // accidentally get force-resumed again by a stale past schedule.
+  if (state.scheduledStartAt && state.timerPaused && Date.now() >= new Date(state.scheduledStartAt).getTime()) {
+    state.timerPaused = false;
+    state.scheduledStartAt = null;
+    console.log('[timer] scheduled start time reached — resuming automatically');
+    io.emit('scheduleUpdate', { scheduledStartAt: null });
+    saveState();
+  }
+
   if (!state.timerPaused && state.currentTimer > 0) {
     state.currentTimer -= 1;
     if (state.currentTimer < 0) state.currentTimer = 0;
   }
   io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
 }, 1000);
+
+// Periodic safety-net save so the ticking currentTimer isn't lost on a crash
+// between the explicit saves that already happen after donations, milestone
+// changes, and admin timer actions.
+setInterval(saveState, 10000);
 
 // ---------------------------------------------------------------------------
 // Extra Life / DonorDrive polling
@@ -237,6 +298,7 @@ async function pollTotalRaised() {
       state.totalRaised = data.sumDonations;
       io.emit('totalUpdate', { totalRaised: state.totalRaised, goal: state.goal });
       checkMilestones();
+      saveState();
     }
   } catch (err) {
     console.error('[poll] failed to fetch participant total:', err.message);
@@ -258,6 +320,7 @@ async function pollDonations() {
         }
       }
       state.hasBaseline = true;
+      saveState();
       return;
     }
 
@@ -267,10 +330,13 @@ async function pollDonations() {
       (a, b) => new Date(a.createdDateUTC) - new Date(b.createdDateUTC)
     );
 
+    let processedAny = false;
+
     for (const donation of sorted) {
       const id = donation.donationID;
       if (id == null || state.processedDonationIds.has(id)) continue;
 
+      processedAny = true;
       state.processedDonationIds.add(id);
 
       const amount = Number(donation.amount) || 0;
@@ -287,8 +353,10 @@ async function pollDonations() {
       console.log(`[donation] ${name} donated $${amount.toFixed(2)} (+${secondsToAdd}s)`);
 
       io.emit('newDonation', { name, amount });
-      io.emit('timerTick', { currentTimer: state.currentTimer });
+      io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
     }
+
+    if (processedAny) saveState();
   } catch (err) {
     console.error('[poll] failed to fetch donations:', err.message);
   }
@@ -440,12 +508,19 @@ app.get('/admin/state', requireAdminAuth, (req, res) => {
 app.post('/admin/timer/pause', requireAdminAuth, (req, res) => {
   state.timerPaused = true;
   io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
+  saveState();
   res.json({ ok: true, timerPaused: state.timerPaused });
 });
 
 app.post('/admin/timer/resume', requireAdminAuth, (req, res) => {
   state.timerPaused = false;
+  // Cancel any pending scheduled auto-resume -- otherwise a later manual
+  // pause (e.g. a stream break) could get force-resumed again by a schedule
+  // whose target time has since passed.
+  state.scheduledStartAt = null;
   io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
+  io.emit('scheduleUpdate', { scheduledStartAt: null });
+  saveState();
   res.json({ ok: true, timerPaused: state.timerPaused });
 });
 
@@ -456,13 +531,37 @@ app.post('/admin/timer/adjust', requireAdminAuth, (req, res) => {
   }
   state.currentTimer = Math.max(0, state.currentTimer + seconds);
   io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
+  saveState();
   res.json({ ok: true, currentTimer: state.currentTimer });
 });
 
 app.post('/admin/timer/reset', requireAdminAuth, (req, res) => {
   state.currentTimer = STARTING_SECONDS;
   io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
+  saveState();
   res.json({ ok: true, currentTimer: state.currentTimer });
+});
+
+app.post('/admin/timer/schedule', requireAdminAuth, (req, res) => {
+  const startAt = req.body && req.body.startAt;
+  const date = new Date(startAt);
+  if (!startAt || Number.isNaN(date.getTime())) {
+    return res.status(400).json({ error: 'startAt must be a valid date/time' });
+  }
+  state.scheduledStartAt = date.toISOString();
+  state.timerPaused = true; // scheduling a future start implies paused until then
+  console.log(`[timer] scheduled auto-resume at ${state.scheduledStartAt}`);
+  io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
+  io.emit('scheduleUpdate', { scheduledStartAt: state.scheduledStartAt });
+  saveState();
+  res.json({ ok: true, scheduledStartAt: state.scheduledStartAt, timerPaused: state.timerPaused });
+});
+
+app.post('/admin/timer/schedule/clear', requireAdminAuth, (req, res) => {
+  state.scheduledStartAt = null;
+  io.emit('scheduleUpdate', { scheduledStartAt: null });
+  saveState();
+  res.json({ ok: true });
 });
 
 // -- Test alerts — visual/audio preview only, never touches real state --
