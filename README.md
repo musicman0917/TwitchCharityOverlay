@@ -21,31 +21,62 @@ The server reads optional environment variables (all have sensible defaults):
 
 | Variable            | Default    | Description                                      |
 |----------------------|-----------|---------------------------------------------------|
-| `PORT`               | `3000`    | Port the Express/Socket.io server listens on      |
+| `PORT`               | `3011`    | Port the Express/Socket.io server listens on      |
 | `PARTICIPANT_ID`     | `567118`  | Extra Life / DonorDrive participant ID to track    |
 | `GOAL_AMOUNT`        | `1000`    | Donation goal shown on the goal bar (in dollars)   |
 | `POLL_INTERVAL_MS`   | `15000`   | How often to poll the Extra Life API (ms)          |
 
-## Running with pm2
+## Deployment (streaming PC — alongside NOM Alerts)
 
-```bash
-npm install -g pm2   # if you don't already have pm2
-pm2 start server.js --name twitch-charity-overlay
-pm2 save             # persist across reboots
-pm2 logs twitch-charity-overlay   # tail logs
-```
+This overlay is meant to run on the same Windows streaming PC as the `nom-token-broker`
+pm2 process (port 3010), as its own independent pm2 app on **port 3011**, in a sibling
+folder — it does not share any files or state with the Alerts app.
 
-To stop/restart:
+1. On the streaming PC, clone (or `git pull` to update) this repo into:
+   ```
+   C:\Users\music\Documents\CharityOverlay\
+   ```
+2. Install dependencies:
+   ```powershell
+   cd C:\Users\music\Documents\CharityOverlay
+   npm install
+   ```
+3. Start it with pm2 using the included `ecosystem.config.js` (sets the app name and
+   port for you — no flags to remember):
+   ```powershell
+   pm2 start ecosystem.config.js
+   pm2 save
+   ```
+   This registers it alongside `nom-token-broker` as `nom-charity-overlay` on port `3011`.
+   Check both are running with:
+   ```powershell
+   pm2 list
+   ```
+4. Persisting pm2 across PC reboots on Windows: unlike Linux, `pm2 startup` isn't native
+   here. If you haven't already set this up for the Alerts app, install
+   [`pm2-windows-startup`](https://www.npmjs.com/package/pm2-windows-startup) once:
+   ```powershell
+   npm install -g pm2-windows-startup
+   pm2-startup install
+   pm2 save
+   ```
+   (If this is already configured for `nom-token-broker`, `nom-charity-overlay` will be
+   picked up automatically the next time you `pm2 save`.)
+5. This overlay is **localhost/LAN-only** — it is not added to the Cloudflare Tunnel, since
+   the OBS Browser Source loading it runs on the same PC.
 
-```bash
-pm2 restart twitch-charity-overlay
-pm2 stop twitch-charity-overlay
+To stop/restart just this app:
+
+```powershell
+pm2 restart nom-charity-overlay
+pm2 stop nom-charity-overlay
+pm2 logs nom-charity-overlay
 ```
 
 ## Adding the overlay to OBS
 
 1. In OBS, add a **Browser Source**.
-2. Set the URL to `http://localhost:3000`.
+2. Set the URL to `http://localhost:3011`.
 3. Set width `1920` and height `1080`.
 4. Check "Shutdown source when not visible" **off**, so the timer keeps ticking in the
    backend regardless (the backend is authoritative — the browser source just displays it).

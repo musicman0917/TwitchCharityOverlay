@@ -7,7 +7,7 @@ const axios = require('axios');
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3011;
 const PARTICIPANT_ID = process.env.PARTICIPANT_ID || '567118';
 const GOAL_AMOUNT = Number(process.env.GOAL_AMOUNT || 1000);
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 15000);
@@ -42,7 +42,17 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve overlay assets with no-cache headers so OBS Browser Source refreshes
+// always pick up the latest files instead of serving a stale cached copy.
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  },
+}));
 
 io.on('connection', (socket) => {
   console.log(`[socket] client connected: ${socket.id}`);
