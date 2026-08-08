@@ -14,11 +14,24 @@ const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 15000);
 const STARTING_SECONDS = 4 * 60 * 60; // 04:00:00
 const SECONDS_PER_DOLLAR = 60; // +1 minute per $1 donated
 
+// NOM Alerts (nom-token-broker) theme sync — shares the Tavern/Purple theme
+// toggle that's controlled from admin.html on the Alerts overlay.
+const NOM_ALERTS_BASE_URL = process.env.NOM_ALERTS_BASE_URL || 'http://localhost:3010';
+const NOM_ALERTS_SSE_URL = `${NOM_ALERTS_BASE_URL}/alerts-stream`;
+const NOM_ALERTS_THEME_STATE_URL = `${NOM_ALERTS_BASE_URL}/theme-state`;
+const VALID_THEMES = new Set(['tavern', 'purple']);
+const SSE_RECONNECT_DELAY_MS = 5000;
+
 const PARTICIPANT_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}`;
 const DONATIONS_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}/donations`;
 
 const donorDriveClient = axios.create({
   timeout: 10000,
+  headers: { 'User-Agent': 'TwitchCharityOverlay/1.0 (OBS Subathon Timer)' },
+});
+
+const nomAlertsClient = axios.create({
+  timeout: 5000,
   headers: { 'User-Agent': 'TwitchCharityOverlay/1.0 (OBS Subathon Timer)' },
 });
 
@@ -33,6 +46,7 @@ const state = {
   latestDonorAmount: null,
   processedDonationIds: new Set(),
   hasBaseline: false, // becomes true after the first successful donations poll
+  theme: 'tavern',
 };
 
 // ---------------------------------------------------------------------------
@@ -68,7 +82,15 @@ function serializeState() {
     goal: state.goal,
     latestDonorName: state.latestDonorName,
     latestDonorAmount: state.latestDonorAmount,
+    theme: state.theme,
   };
+}
+
+function setTheme(theme) {
+  if (!VALID_THEMES.has(theme) || theme === state.theme) return;
+  state.theme = theme;
+  console.log(`[theme] switched to "${theme}"`);
+  io.emit('themeUpdate', { theme: state.theme });
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +177,103 @@ async function pollExtraLife() {
 // Kick off an initial poll immediately, then repeat on the interval.
 pollExtraLife();
 setInterval(pollExtraLife, POLL_INTERVAL_MS);
+
+// ---------------------------------------------------------------------------
+// NOM Alerts theme sync — live via SSE from nom-token-broker's /alerts-stream,
+// with an initial fetch from /theme-state so we start on the right theme
+// instead of always booting into "tavern".
+//
+// NOTE: the exact event name / payload shape nom-token-broker uses for theme
+// changes wasn't available when this was written, so handleSseMessage()
+// checks a few reasonable shapes. If the real broadcast looks different,
+// adjust handleSseMessage() and fetchInitialTheme() below to match it.
+// ---------------------------------------------------------------------------
+async function fetchInitialTheme() {
+  try {
+    const { data } = await nomAlertsClient.get(NOM_ALERTS_THEME_STATE_URL);
+    const theme = data && (data.theme || data.currentTheme);
+    if (typeof theme === 'string' && VALID_THEMES.has(theme)) {
+      state.theme = theme;
+      console.log(`[theme] initial theme from NOM Alerts: "${theme}"`);
+    }
+  } catch (err) {
+    console.warn(
+      `[theme] could not fetch initial theme from NOM Alerts (${err.message}); defaulting to "${state.theme}"`
+    );
+  }
+}
+
+function handleSseMessage(raw) {
+  if (!raw.trim()) return;
+
+  let eventName = 'message';
+  const dataLines = [];
+
+  for (const line of raw.split('\n')) {
+    if (line.startsWith('event:')) {
+      eventName = line.slice('event:'.length).trim();
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice('data:'.length).trim());
+    }
+  }
+
+  const rawData = dataLines.join('\n');
+  if (!rawData) return;
+
+  let payload;
+  try {
+    payload = JSON.parse(rawData);
+  } catch {
+    return; // not JSON, ignore
+  }
+
+  const candidateTheme =
+    (eventName === 'theme' && payload.theme) ||
+    (payload.type === 'theme' && payload.theme) ||
+    payload.theme;
+
+  if (typeof candidateTheme === 'string' && VALID_THEMES.has(candidateTheme)) {
+    setTheme(candidateTheme);
+  }
+}
+
+function connectToAlertsThemeStream() {
+  axios
+    .get(NOM_ALERTS_SSE_URL, {
+      responseType: 'stream',
+      timeout: 0,
+      headers: { Accept: 'text/event-stream' },
+    })
+    .then((response) => {
+      console.log(`[theme] connected to NOM Alerts SSE stream at ${NOM_ALERTS_SSE_URL}`);
+      let buffer = '';
+
+      response.data.on('data', (chunk) => {
+        buffer += chunk.toString('utf8');
+        const messages = buffer.split('\n\n');
+        buffer = messages.pop(); // keep trailing partial message for next chunk
+        for (const raw of messages) handleSseMessage(raw);
+      });
+
+      response.data.on('end', () => {
+        console.warn('[theme] NOM Alerts SSE stream ended; reconnecting in 5s');
+        setTimeout(connectToAlertsThemeStream, SSE_RECONNECT_DELAY_MS);
+      });
+
+      response.data.on('error', (err) => {
+        console.error(`[theme] NOM Alerts SSE stream error: ${err.message}; reconnecting in 5s`);
+        setTimeout(connectToAlertsThemeStream, SSE_RECONNECT_DELAY_MS);
+      });
+    })
+    .catch((err) => {
+      console.warn(
+        `[theme] could not connect to NOM Alerts SSE stream (${err.message}); retrying in 5s`
+      );
+      setTimeout(connectToAlertsThemeStream, SSE_RECONNECT_DELAY_MS);
+    });
+}
+
+fetchInitialTheme().then(connectToAlertsThemeStream);
 
 // ---------------------------------------------------------------------------
 server.listen(PORT, () => {

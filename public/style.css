@@ -1,23 +1,71 @@
 /* ==========================================================================
-   Tavern Subathon Overlay — cozy fantasy tavern theme
+   Tavern Subathon Overlay — cozy fantasy tavern theme (+ Purple alt theme,
+   shared with the NOM Alerts overlay system)
    Designed for a 1920x1080 OBS Browser Source (transparent background).
    ========================================================================== */
 
 :root {
-  --espresso: #2c1e16;
-  --espresso-dark: #1a110b;
-  --wood-light: #4a3222;
-  --wood-dark: #241811;
-  --parchment: #f1e3c6;
-  --parchment-dark: #e2cfa4;
+  /* Tavern (default) theme */
+  --card-bg-1: #f1e3c6;
+  --card-bg-2: #e2cfa4;
+  --card-border: #d4a94e;
+
+  --frame-bg-1: #4a3222;
+  --frame-bg-2: #241811;
+  --frame-tint: rgba(44, 30, 22, 0.4);
+  --deep-border: #1a110b;
+  --track-border: #2c1e16;
+
+  --heading-color: #2c1e16;
+  --body-color: #3b2a1c;
+  --label-color: #3b2a1c;
+  --accent-strong: #8a5a1e;
+  --base-text: #f1e3c6;
+  --muted-text: #e2cfa4;
+
   --gold: #d4a94e;
   --gold-bright: #f2c766;
-  --ink: #3b2a1c;
+
   --shadow: rgba(0, 0, 0, 0.65);
+  --glow-scroll: rgba(120, 80, 30, 0.25);
+  --glow-board-top: rgba(255, 200, 120, 0.15);
+  --glow-inner: rgba(120, 80, 30, 0.3);
+  --glow-bar: rgba(242, 199, 102, 0.7);
+  --divider: rgba(90, 60, 30, 0.35);
 
   --font-heading: 'MedievalSharp', cursive;
   --font-title: 'Cinzel', serif;
   --font-body: 'Lora', serif;
+}
+
+/* Purple theme — matches NOM Alerts' alternate palette */
+:root[data-theme='purple'] {
+  --card-bg-1: #1a0a2e;
+  --card-bg-2: #0d0620;
+  --card-border: #7b2fbe;
+
+  --frame-bg-1: #9b59b6;
+  --frame-bg-2: #0d0620;
+  --frame-tint: rgba(13, 6, 32, 0.5);
+  --deep-border: #0d0620;
+  --track-border: #0d0620;
+
+  --heading-color: #fff8dc;
+  --body-color: #fff8dc;
+  --label-color: #d4aaff;
+  --accent-strong: #ffd700;
+  --base-text: #fff8dc;
+  --muted-text: #d4aaff;
+
+  --gold: #ffd700;
+  --gold-bright: #ffd700;
+
+  --shadow: rgba(0, 0, 0, 0.65);
+  --glow-scroll: rgba(155, 89, 182, 0.35);
+  --glow-board-top: rgba(155, 89, 182, 0.25);
+  --glow-inner: rgba(155, 89, 182, 0.35);
+  --glow-bar: rgba(155, 89, 182, 0.6);
+  --divider: rgba(155, 89, 182, 0.35);
 }
 
 * {
@@ -32,7 +80,7 @@ html, body {
   overflow: hidden;
   background: transparent;
   font-family: var(--font-body);
-  color: var(--parchment);
+  color: var(--base-text);
 }
 
 /* --------------------------------------------------------------------------
@@ -66,22 +114,24 @@ html, body {
 .asset-box {
   width: 130px;
   height: 130px;
-  border: 3px dashed var(--gold);
+  border: 3px dashed var(--card-border);
   border-radius: 8px;
-  background: rgba(44, 30, 22, 0.45);
+  background: var(--frame-tint);
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 8px;
+  transition: border-color 0.4s ease, background-color 0.4s ease;
 }
 
 .asset-box span {
   font-family: var(--font-title);
   font-size: 15px;
   letter-spacing: 0.03em;
-  color: var(--parchment-dark);
+  color: var(--muted-text);
   text-shadow: 0 2px 4px var(--shadow);
+  transition: color 0.4s ease;
 }
 
 /* --------------------------------------------------------------------------
@@ -107,13 +157,14 @@ html, body {
 .alert-scroll {
   background:
     radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.08), transparent 60%),
-    linear-gradient(160deg, var(--parchment) 0%, var(--parchment-dark) 100%);
-  border: 4px solid var(--gold);
+    linear-gradient(160deg, var(--card-bg-1) 0%, var(--card-bg-2) 100%);
+  border: 4px solid var(--card-border);
   border-radius: 10px;
   padding: 28px 40px;
   text-align: center;
-  box-shadow: 0 12px 32px var(--shadow), inset 0 0 30px rgba(120, 80, 30, 0.25);
+  box-shadow: 0 12px 32px var(--shadow), inset 0 0 30px var(--glow-scroll);
   position: relative;
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 .alert-scroll::before,
@@ -123,9 +174,10 @@ html, body {
   top: -6px;
   bottom: -6px;
   width: 22px;
-  background: linear-gradient(180deg, var(--wood-light), var(--wood-dark));
-  border: 2px solid var(--espresso-dark);
+  background: linear-gradient(180deg, var(--frame-bg-1), var(--frame-bg-2));
+  border: 2px solid var(--deep-border);
   border-radius: 6px;
+  transition: background 0.4s ease, border-color 0.4s ease;
 }
 
 .alert-scroll::before { left: -18px; }
@@ -135,8 +187,9 @@ html, body {
   margin: 0 0 8px;
   font-family: var(--font-heading);
   font-size: 34px;
-  color: var(--espresso);
+  color: var(--heading-color);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: color 0.4s ease;
 }
 
 .alert-body {
@@ -144,12 +197,14 @@ html, body {
   font-family: var(--font-body);
   font-size: 26px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--body-color);
+  transition: color 0.4s ease;
 }
 
 .alert-body span {
-  color: #8a5a1e;
+  color: var(--accent-strong);
   font-weight: 700;
+  transition: color 0.4s ease;
 }
 
 /* --------------------------------------------------------------------------
@@ -165,13 +220,14 @@ html, body {
   background:
     repeating-linear-gradient(
       90deg,
-      var(--wood-light) 0px,
-      var(--wood-dark) 3px,
-      var(--wood-light) 6px,
-      var(--wood-dark) 140px
+      var(--frame-bg-1) 0px,
+      var(--frame-bg-2) 3px,
+      var(--frame-bg-1) 6px,
+      var(--frame-bg-2) 140px
     );
-  border-top: 6px solid var(--espresso-dark);
-  box-shadow: 0 -10px 30px var(--shadow), inset 0 3px 0 rgba(255, 200, 120, 0.15);
+  border-top: 6px solid var(--deep-border);
+  box-shadow: 0 -10px 30px var(--shadow), inset 0 3px 0 var(--glow-board-top);
+  transition: background 0.4s ease, border-color 0.4s ease;
 }
 
 .quest-board-inner {
@@ -184,10 +240,11 @@ html, body {
   gap: 28px;
   background:
     radial-gradient(ellipse at top, rgba(255, 255, 255, 0.06), transparent 60%),
-    linear-gradient(180deg, var(--parchment) 0%, var(--parchment-dark) 100%);
-  border: 3px solid var(--gold);
+    linear-gradient(180deg, var(--card-bg-1) 0%, var(--card-bg-2) 100%);
+  border: 3px solid var(--card-border);
   border-radius: 10px;
-  box-shadow: inset 0 0 25px rgba(120, 80, 30, 0.3);
+  box-shadow: inset 0 0 25px var(--glow-inner);
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 .quest-section {
@@ -201,25 +258,28 @@ html, body {
   font-size: 16px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink);
+  color: var(--label-color);
   margin-bottom: 6px;
+  transition: color 0.4s ease;
 }
 
 /* Timer */
 .timer-section {
   flex: 0 0 auto;
   min-width: 260px;
-  border-right: 2px solid rgba(90, 60, 30, 0.35);
+  border-right: 2px solid var(--divider);
   padding-right: 28px;
+  transition: border-color 0.4s ease;
 }
 
 .timer {
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 52px;
-  color: var(--espresso);
+  color: var(--heading-color);
   letter-spacing: 0.03em;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: color 0.4s ease;
 }
 
 /* Goal tracker */
@@ -238,19 +298,20 @@ html, body {
 .goal-bar-track {
   width: 100%;
   height: 26px;
-  background: rgba(44, 30, 22, 0.35);
-  border: 2px solid var(--espresso);
+  background: var(--frame-tint);
+  border: 2px solid var(--track-border);
   border-radius: 13px;
   overflow: hidden;
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.4s ease, background-color 0.4s ease;
 }
 
 .goal-bar-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #a8761f, var(--gold), var(--gold-bright));
-  box-shadow: 0 0 12px rgba(242, 199, 102, 0.7);
-  transition: width 0.8s ease-out;
+  background: linear-gradient(90deg, var(--gold), var(--gold), var(--gold-bright));
+  box-shadow: 0 0 12px var(--glow-bar);
+  transition: width 0.8s ease-out, background 0.4s ease, box-shadow 0.4s ease;
 }
 
 /* Latest hero */
@@ -258,16 +319,18 @@ html, body {
   flex: 0 0 auto;
   min-width: 320px;
   max-width: 420px;
-  border-left: 2px solid rgba(90, 60, 30, 0.35);
+  border-left: 2px solid var(--divider);
   padding-left: 28px;
+  transition: border-color 0.4s ease;
 }
 
 .latest-hero {
   font-family: var(--font-body);
   font-size: 22px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--body-color);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color 0.4s ease;
 }

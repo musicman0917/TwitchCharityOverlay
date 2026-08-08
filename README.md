@@ -19,12 +19,13 @@ npm install
 
 The server reads optional environment variables (all have sensible defaults):
 
-| Variable            | Default    | Description                                      |
-|----------------------|-----------|---------------------------------------------------|
-| `PORT`               | `3011`    | Port the Express/Socket.io server listens on      |
-| `PARTICIPANT_ID`     | `567118`  | Extra Life / DonorDrive participant ID to track    |
-| `GOAL_AMOUNT`        | `1000`    | Donation goal shown on the goal bar (in dollars)   |
-| `POLL_INTERVAL_MS`   | `15000`   | How often to poll the Extra Life API (ms)          |
+| Variable              | Default                 | Description                                        |
+|-----------------------|--------------------------|-----------------------------------------------------|
+| `PORT`                | `3011`                   | Port the Express/Socket.io server listens on         |
+| `PARTICIPANT_ID`      | `567118`                 | Extra Life / DonorDrive participant ID to track      |
+| `GOAL_AMOUNT`         | `1000`                   | Donation goal shown on the goal bar (in dollars)     |
+| `POLL_INTERVAL_MS`    | `15000`                  | How often to poll the Extra Life API (ms)            |
+| `NOM_ALERTS_BASE_URL` | `http://localhost:3010`  | Base URL of the `nom-token-broker` server, used for theme sync (see below) |
 
 ## Deployment (streaming PC — alongside NOM Alerts)
 
@@ -95,6 +96,32 @@ pm2 logs nom-charity-overlay
 - State (timer, total raised, processed donation IDs) lives in memory only and resets if the
   server process restarts — pm2 keeps the process alive so this should only happen on
   intentional restarts or crashes.
+
+## Shared theme (Tavern / Purple)
+
+This overlay shares the same Tavern/Purple theme toggle as NOM Alerts, controlled from
+`admin.html` on the Alerts app:
+
+- On startup, the charity overlay backend fetches the current theme from `nom-token-broker`'s
+  `GET /theme-state` endpoint.
+- It then connects to `nom-token-broker`'s `/alerts-stream` SSE feed and listens for theme
+  change events, instantly re-broadcasting them to its own overlay clients over Socket.io
+  (`themeUpdate`) — so flipping the theme in admin.html updates both overlays at the same time.
+- If `nom-token-broker` isn't reachable (not started yet, wrong port, etc.), the charity
+  overlay logs a warning, retries the SSE connection every 5 seconds, and falls back to the
+  Tavern theme in the meantime — it never crashes or blocks on the Alerts app being up.
+
+**Note:** the exact SSE event name/payload `nom-token-broker` uses for theme changes wasn't
+available when this was built, so `handleSseMessage()` and `fetchInitialTheme()` in
+`server.js` accept a few reasonable shapes (`event: theme` with `{"theme":"purple"}`,
+`{"type":"theme","theme":"purple"}`, or a flat `{"theme":"purple"}`/`{"currentTheme":"purple"}`
+field). If the live sync doesn't pick up theme changes, check your actual `/theme-state`
+response shape and SSE event format and adjust those two functions to match — everything
+else (the CSS variables, the `themeUpdate` Socket.io broadcast, the frontend `data-theme`
+toggle) is already wired up and tested against both themes.
+
+If `NOM_ALERTS_BASE_URL` points somewhere unreachable, or you don't want theme sync at all,
+the overlay just stays on Tavern — no configuration needed to disable it.
 
 ## Asset placeholders
 

@@ -11,6 +11,15 @@ const alertAmountEl = document.getElementById('alert-amount');
 
 let goal = 1000;
 
+function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === 'purple') {
+    root.setAttribute('data-theme', 'purple');
+  } else {
+    root.removeAttribute('data-theme'); // 'tavern' (default)
+  }
+}
+
 function formatTimer(totalSeconds) {
   const s = Math.max(0, Math.floor(totalSeconds));
   const hours = Math.floor(s / 3600);
@@ -81,6 +90,11 @@ socket.on('state', (data) => {
   if (data.latestDonorName) {
     updateLatestHero(data.latestDonorName, data.latestDonorAmount);
   }
+  applyTheme(data.theme);
+});
+
+socket.on('themeUpdate', (data) => {
+  applyTheme(data.theme);
 });
 
 socket.on('timerTick', (data) => {
