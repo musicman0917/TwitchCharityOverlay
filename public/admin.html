@@ -156,6 +156,64 @@
   .tier-row .tier-label { width: 130px; flex: 0 0 auto; font-size: 13px; }
   .tier-row .tier-file-name { font-size: 11px; color: var(--muted); }
 
+  .tier-block {
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .tier-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .tier-block-label {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .tier-sound-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .tier-sound-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    padding: 5px 10px;
+  }
+
+  .tier-sound-name {
+    flex: 1 1 auto;
+    font-size: 11px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tier-sound-item button {
+    padding: 3px 10px;
+    font-size: 11px;
+    flex: 0 0 auto;
+  }
+
+  .tier-empty {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+    margin-bottom: 10px;
+  }
+
+  .tier-add-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
   .msg {
     font-size: 12px;
     margin-top: 8px;
@@ -314,7 +372,10 @@
 
     <div class="panel">
       <h2>Donation Alert Sounds</h2>
-      <p class="subtitle" style="margin-bottom: 12px;">Uploads replace the mp3/wav file for that tier immediately — no restart needed.</p>
+      <p class="subtitle" style="margin-bottom: 12px;">
+        Each tier can have multiple sounds — the overlay picks one at random per alert.
+        Changes take effect immediately, no restart needed.
+      </p>
       <div id="tier-rows"></div>
       <div class="msg" id="sound-msg"></div>
     </div>
@@ -481,6 +542,10 @@
     });
     socket.on('scheduleUpdate', (data) => {
       renderScheduleStatus(data.scheduledStartAt);
+    });
+    socket.on('donationTiersUpdate', (data) => {
+      currentTiers = data.donationTiers;
+      renderTierBlocks();
     });
 
     // -- Timer controls --
@@ -700,57 +765,128 @@
     });
 
     // -- Sound upload --
+    let currentTiers = [];
+
     async function loadTiers() {
       const container = document.getElementById('tier-rows');
       container.innerHTML = 'Loading…';
       try {
         const res = await fetch('donation-tiers.json');
-        const tiers = await res.json();
-        container.innerHTML = '';
-        tiers.forEach((tier) => addTierRow(tier));
+        currentTiers = await res.json();
+        renderTierBlocks();
       } catch (err) {
         container.textContent = `Could not load donation-tiers.json (${err.message})`;
       }
     }
 
-    function addTierRow(tier) {
+    function renderTierBlocks() {
       const container = document.getElementById('tier-rows');
-      const row = document.createElement('div');
-      row.className = 'tier-row';
+      container.innerHTML = '';
+      currentTiers.forEach((tier) => addTierBlock(tier));
+    }
+
+    function addTierBlock(tier) {
+      const container = document.getElementById('tier-rows');
+      const block = document.createElement('div');
+      block.className = 'tier-block';
 
       const label = document.createElement('div');
-      label.className = 'tier-label';
+      label.className = 'tier-block-label';
       label.textContent = tier.label || tier.id;
+
+      const list = document.createElement('div');
+      list.className = 'tier-sound-list';
+      const sounds = Array.isArray(tier.sounds) ? tier.sounds : [];
+
+      if (sounds.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'tier-empty';
+        empty.textContent = 'No sounds yet — alerts for this tier will be silent.';
+        list.appendChild(empty);
+      }
+
+      sounds.forEach((sound) => {
+        // Tolerate a bare string too, in case the raw file hasn't been
+        // normalized to {path, name} yet (server.js normalizes on every
+        // boot, but this is cheap insurance either way).
+        const soundPath = typeof sound === 'string' ? sound : sound.path;
+        const soundName = typeof sound === 'string' ? null : sound.name;
+        const item = document.createElement('div');
+        item.className = 'tier-sound-item';
+
+        const name = document.createElement('span');
+        name.className = 'tier-sound-name';
+        name.textContent = soundName || soundPath;
+        name.title = soundPath;
+
+        const playBtn = document.createElement('button');
+        playBtn.className = 'secondary';
+        playBtn.textContent = '▶ Play';
+        playBtn.addEventListener('click', () => {
+          new Audio(soundPath).play().catch(() => {});
+        });
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'danger';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', async () => {
+          const msgEl = document.getElementById('sound-msg');
+          const res = await apiFetch('/admin/remove-sound', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tier: tier.id, sound: soundPath }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            tier.sounds = data.sounds;
+            renderTierBlocks();
+            msgEl.textContent = `Removed "${soundName || soundPath}" from ${tier.label || tier.id}.`;
+            msgEl.className = 'msg ok';
+          } else {
+            msgEl.textContent = 'Failed to remove sound.';
+            msgEl.className = 'msg err';
+          }
+        });
+
+        item.append(name, playBtn, removeBtn);
+        list.appendChild(item);
+      });
+
+      const addRow = document.createElement('div');
+      addRow.className = 'tier-add-row';
 
       const fileInput = document.createElement('input');
       fileInput.type = 'file';
       fileInput.accept = 'audio/*';
+      fileInput.multiple = true;
 
       const uploadBtn = document.createElement('button');
       uploadBtn.className = 'secondary';
-      uploadBtn.textContent = 'Upload';
-
-      const fileName = document.createElement('span');
-      fileName.className = 'tier-file-name';
-      fileName.textContent = tier.sound || '';
+      uploadBtn.textContent = 'Add Sound(s)';
 
       uploadBtn.addEventListener('click', async () => {
-        const file = fileInput.files[0];
+        const files = fileInput.files;
         const msgEl = document.getElementById('sound-msg');
-        if (!file) {
-          msgEl.textContent = 'Choose a file first.';
+        if (!files || files.length === 0) {
+          msgEl.textContent = 'Choose one or more files first.';
           msgEl.className = 'msg err';
           return;
         }
         const formData = new FormData();
         formData.append('tier', tier.id);
-        formData.append('file', file);
+        for (const file of files) formData.append('files', file);
         try {
           const res = await apiFetch('/admin/upload-sound', { method: 'POST', body: formData });
           const data = await res.json();
           if (res.ok) {
-            msgEl.textContent = `Uploaded sound for ${tier.label || tier.id}.`;
-            msgEl.className = 'msg ok';
+            tier.sounds = data.sounds;
+            renderTierBlocks();
+            const parts = [`Added ${data.added} sound${data.added === 1 ? '' : 's'} to ${tier.label || tier.id}.`];
+            if (data.errors && data.errors.length) {
+              parts.push(`${data.errors.length} failed: ${data.errors.map((e) => `${e.name} (${e.error})`).join(', ')}`);
+            }
+            msgEl.textContent = parts.join(' ');
+            msgEl.className = data.errors && data.errors.length ? 'msg err' : 'msg ok';
           } else {
             msgEl.textContent = data.error || 'Upload failed.';
             msgEl.className = 'msg err';
@@ -761,8 +897,9 @@
         }
       });
 
-      row.append(label, fileInput, uploadBtn, fileName);
-      container.appendChild(row);
+      addRow.append(fileInput, uploadBtn);
+      block.append(label, list, addRow);
+      container.appendChild(block);
     }
 
     // -- Asset image upload (QR code / logos) --

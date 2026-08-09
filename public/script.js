@@ -151,22 +151,25 @@ function processMilestoneAlertQueue() {
 }
 
 // --------------------------------------------------------------------------
-// Donation tiers — thresholds/sound/duration are configured in
+// Donation tiers — thresholds/sounds/duration are configured in
 // donation-tiers.json (fetched once below), purely a presentation concern:
 // bigger donations get a bigger, longer, more glowing alert plus a louder
-// tier of sound effect. Falls back to a single default tier if the file is
-// missing/unreachable so the alert still works either way.
+// tier of sound effect. Each tier can have multiple sounds; one is picked
+// at random per alert. Falls back to a single default tier (no sound) if
+// the file is missing/unreachable so the alert still works either way.
 // --------------------------------------------------------------------------
-const DEFAULT_DONATION_TIER = { id: 'tier1', minAmount: 0, durationMs: 5000, sound: null };
+const DEFAULT_DONATION_TIER = { id: 'tier1', minAmount: 0, durationMs: 5000, sounds: [] };
 let donationTiers = [DEFAULT_DONATION_TIER];
+
+function loadDonationTiersData(data) {
+  if (Array.isArray(data) && data.length) {
+    donationTiers = [...data].sort((a, b) => a.minAmount - b.minAmount);
+  }
+}
 
 fetch('donation-tiers.json')
   .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-  .then((data) => {
-    if (Array.isArray(data) && data.length) {
-      donationTiers = [...data].sort((a, b) => a.minAmount - b.minAmount);
-    }
-  })
+  .then(loadDonationTiersData)
   .catch((err) => {
     console.warn(`[donation-tiers] could not load donation-tiers.json (${err.message}); using default tier`);
   });
@@ -177,6 +180,15 @@ function getTierForAmount(amount) {
     if (amount >= tier.minAmount) match = tier;
   }
   return match;
+}
+
+function pickRandomSound(tier) {
+  const sounds = tier.sounds;
+  if (!Array.isArray(sounds) || sounds.length === 0) return null;
+  const chosen = sounds[Math.floor(Math.random() * sounds.length)];
+  // Sounds are { path, name } objects; tolerate a bare string too in case
+  // an older cached donation-tiers.json is still being served somewhere.
+  return typeof chosen === 'string' ? chosen : chosen.path;
 }
 
 // --------------------------------------------------------------------------
@@ -213,17 +225,18 @@ const DONATION_SOUND_VOLUME = 0.8;
 const donationSoundCache = {};
 
 function playDonationSound(tier) {
-  if (!tier.sound) return;
-  let audio = donationSoundCache[tier.id];
+  const soundPath = pickRandomSound(tier);
+  if (!soundPath) return;
+  let audio = donationSoundCache[soundPath];
   if (!audio) {
-    audio = new Audio(tier.sound);
+    audio = new Audio(soundPath);
     audio.volume = DONATION_SOUND_VOLUME;
-    donationSoundCache[tier.id] = audio;
+    donationSoundCache[soundPath] = audio;
   }
   audio.currentTime = 0;
   audio.play().catch(() => {
     // Missing/unreadable sound file — silently no-op until a real file is
-    // dropped in public/Assets/Sounds/ (see the README there).
+    // added through the admin portal (see Assets/Sounds/README.md).
   });
 }
 
@@ -290,6 +303,10 @@ socket.on('themeUpdate', (data) => {
 
 socket.on('assetImagesUpdate', (data) => {
   applyAssetImages(data.assetImages);
+});
+
+socket.on('donationTiersUpdate', (data) => {
+  loadDonationTiersData(data.donationTiers);
 });
 
 socket.on('timerTick', (data) => {
