@@ -102,6 +102,18 @@ pm2 logs nom-charity-overlay
 5. Refreshing the browser source is safe at any time: on connect, the server immediately
    sends the current timer, total raised, and latest donor so nothing resets.
 
+## Clip-friendly layout
+
+The bottom bar is deliberately **three separate panels** (Timer, Goal, Latest Hero) with real
+gaps between them, not one continuous connected bar. Auto-clipping tools (e.g. StreamLadder)
+crop a vertical 9:16 slice out of the 1920-wide frame — with everything joined into a single
+bar, that crop could land mid-section and show a confusing, jaggedly-cropped fragment. With
+separate panels, a crop either lands cleanly within one complete panel or in the transparent
+gap between panels, never a half-cut connected edge. The Timer and Latest Hero panels are
+narrow enough to often fit entirely within a typical crop; the Goal panel is wider (it needs
+room for the progress bar) so a centered crop may still only show part of it, but as a clean
+window into a solid card rather than a broken edge.
+
 ## How the donothon timer works
 
 - The timer starts at a **base duration** (default 4 hours — set `STARTING_HOURS` before the

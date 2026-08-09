@@ -52,31 +52,32 @@
     </div>
   </div>
 
-  <!-- Bottom UI bar: The Quest Board -->
+  <!-- Bottom UI bar: The Quest Board — three separate panels (not one
+       continuous bar) so a vertical clip crop (e.g. StreamLadder) always
+       lands cleanly on a complete panel or the gap between them, instead
+       of slicing through the middle of a single connected slab. -->
   <div class="quest-board" id="quest-board">
-    <div class="quest-board-inner">
 
-      <div class="quest-section timer-section">
-        <span class="quest-label">Donothon Timer</span>
-        <span class="timer" id="timer">04:00:00</span>
-      </div>
-
-      <div class="quest-section goal-section">
-        <span class="quest-label" id="goal-text">$0 / $1000 &mdash; For Dayton Children's Hospital</span>
-        <div class="goal-bar-wrap">
-          <div class="goal-bar-track">
-            <div class="goal-bar-fill" id="goal-bar-fill"></div>
-          </div>
-          <div class="goal-bar-markers" id="goal-bar-markers"></div>
-        </div>
-      </div>
-
-      <div class="quest-section hero-section">
-        <span class="quest-label">Latest Hero</span>
-        <span class="latest-hero" id="latest-hero">Awaiting a brave soul&hellip;</span>
-      </div>
-
+    <div class="quest-panel timer-section">
+      <span class="quest-label">Donothon Timer</span>
+      <span class="timer" id="timer">04:00:00</span>
     </div>
+
+    <div class="quest-panel goal-section">
+      <span class="quest-label" id="goal-text">$0 / $1000 &mdash; For Dayton Children's Hospital</span>
+      <div class="goal-bar-wrap">
+        <div class="goal-bar-track">
+          <div class="goal-bar-fill" id="goal-bar-fill"></div>
+        </div>
+        <div class="goal-bar-markers" id="goal-bar-markers"></div>
+      </div>
+    </div>
+
+    <div class="quest-panel hero-section">
+      <span class="quest-label">Latest Hero</span>
+      <span class="latest-hero" id="latest-hero">Awaiting a brave soul&hellip;</span>
+    </div>
+
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
