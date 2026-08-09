@@ -80,22 +80,6 @@ html, body {
 }
 
 /* --------------------------------------------------------------------------
-   Vignette — dark fantasy atmosphere around the frame edges
-   -------------------------------------------------------------------------- */
-.vignette {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 5;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(0, 0, 0, 0) 45%,
-    rgba(20, 12, 6, 0.35) 75%,
-    rgba(10, 6, 3, 0.85) 100%
-  );
-}
-
-/* --------------------------------------------------------------------------
    Asset placeholders — top right corner
    -------------------------------------------------------------------------- */
 .asset-corner {
