@@ -318,6 +318,16 @@
       <div id="tier-rows"></div>
       <div class="msg" id="sound-msg"></div>
     </div>
+
+    <div class="panel">
+      <h2>Asset Images</h2>
+      <p class="subtitle" style="margin-bottom: 12px;">
+        Upload the QR code and logo images for the top-right boxes on the overlay. PNG, JPEG,
+        GIF, WebP, or SVG — takes effect immediately, no restart needed.
+      </p>
+      <div id="asset-image-rows"></div>
+      <div class="msg" id="asset-image-msg"></div>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -354,6 +364,7 @@
       refreshStatus();
       loadMilestones();
       loadTiers();
+      loadAssetImages();
     }
 
     document.getElementById('login-btn').addEventListener('click', async () => {
@@ -751,6 +762,78 @@
       });
 
       row.append(label, fileInput, uploadBtn, fileName);
+      container.appendChild(row);
+    }
+
+    // -- Asset image upload (QR code / logos) --
+    async function loadAssetImages() {
+      const container = document.getElementById('asset-image-rows');
+      container.innerHTML = 'Loading…';
+      try {
+        const res = await fetch('asset-images.json');
+        const assets = await res.json();
+        container.innerHTML = '';
+        assets.forEach((asset) => addAssetImageRow(asset));
+      } catch (err) {
+        container.textContent = `Could not load asset-images.json (${err.message})`;
+      }
+    }
+
+    function addAssetImageRow(asset) {
+      const container = document.getElementById('asset-image-rows');
+      const row = document.createElement('div');
+      row.className = 'tier-row';
+
+      const label = document.createElement('div');
+      label.className = 'tier-label';
+      label.textContent = asset.label || asset.id;
+
+      const preview = document.createElement('img');
+      preview.style.cssText = 'width:40px;height:40px;object-fit:contain;background:rgba(255,255,255,0.05);border-radius:4px;flex:0 0 auto;';
+      if (asset.file) preview.src = asset.file;
+
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml';
+
+      const uploadBtn = document.createElement('button');
+      uploadBtn.className = 'secondary';
+      uploadBtn.textContent = 'Upload';
+
+      const fileName = document.createElement('span');
+      fileName.className = 'tier-file-name';
+      fileName.textContent = asset.file || 'No image uploaded';
+
+      uploadBtn.addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        const msgEl = document.getElementById('asset-image-msg');
+        if (!file) {
+          msgEl.textContent = 'Choose a file first.';
+          msgEl.className = 'msg err';
+          return;
+        }
+        const formData = new FormData();
+        formData.append('asset', asset.id);
+        formData.append('file', file);
+        try {
+          const res = await apiFetch('/admin/upload-image', { method: 'POST', body: formData });
+          const data = await res.json();
+          if (res.ok) {
+            preview.src = data.path;
+            fileName.textContent = data.path;
+            msgEl.textContent = `Uploaded image for ${asset.label || asset.id}.`;
+            msgEl.className = 'msg ok';
+          } else {
+            msgEl.textContent = data.error || 'Upload failed.';
+            msgEl.className = 'msg err';
+          }
+        } catch (err) {
+          msgEl.textContent = `Upload failed: ${err.message}`;
+          msgEl.className = 'msg err';
+        }
+      });
+
+      row.append(label, preview, fileInput, uploadBtn, fileName);
       container.appendChild(row);
     }
 

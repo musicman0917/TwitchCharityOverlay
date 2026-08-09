@@ -277,8 +277,18 @@ and always written to a server-controlled path derived from `donation-tiers.json
 uploaded filename and the `tier` field are never used to build a filesystem path, so there's
 no path-traversal risk from a malformed request.
 
-## Asset placeholders
+## Asset images (QR code + logos)
 
-The top-right corner of the overlay has three dashed-border placeholder boxes for "QR Code",
-"Extra Life Logo", and "Dayton Children's Logo". Swap them for real images by editing
-`public/index.html`/`public/style.css` (e.g. give each box a `background-image`).
+The top-right corner has three boxes — "QR Code", "Extra Life Logo", "Dayton Children's
+Logo" — dashed-border placeholders until you upload real images through the admin portal's
+**Asset Images** panel (PNG, JPEG, GIF, WebP, or SVG). Once uploaded, a box switches to a
+solid border, shows the image, and drops its placeholder label — takes effect immediately on
+any open overlay via a live socket update, no restart or reload needed.
+
+This works the same way as donation alert sound uploads: `public/asset-images.json` maps
+each box's id to its uploaded file path (`null` until something's uploaded), the unauthenticated
+overlay fetches that manifest client-side to know what to display, and the upload endpoint
+resolves the destination filename entirely from the known asset id (never from the uploaded
+file's name or arbitrary request input), so there's no path-traversal risk. Re-uploading a
+different format for the same box (e.g. swapping a `.png` for a `.svg`) automatically removes
+the old file instead of leaving stale duplicates around.

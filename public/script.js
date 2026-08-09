@@ -179,6 +179,36 @@ function getTierForAmount(amount) {
   return match;
 }
 
+// --------------------------------------------------------------------------
+// Asset images — QR code / logo boxes uploaded through the admin portal.
+// asset-images.json maps asset id -> uploaded file path (or null if nothing
+// uploaded yet, in which case the dashed placeholder + label stay showing).
+// --------------------------------------------------------------------------
+function applyAssetImages(assetImages) {
+  for (const asset of assetImages) {
+    const boxEl = document.getElementById(`${asset.id}-box`);
+    const imgEl = document.getElementById(`${asset.id}-image`);
+    if (!boxEl || !imgEl) continue;
+
+    if (asset.file) {
+      imgEl.src = asset.file;
+      boxEl.classList.add('has-image');
+    } else {
+      imgEl.removeAttribute('src');
+      boxEl.classList.remove('has-image');
+    }
+  }
+}
+
+fetch('asset-images.json')
+  .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+  .then((data) => {
+    if (Array.isArray(data)) applyAssetImages(data);
+  })
+  .catch((err) => {
+    console.warn(`[asset-images] could not load asset-images.json (${err.message})`);
+  });
+
 const DONATION_SOUND_VOLUME = 0.8;
 const donationSoundCache = {};
 
@@ -256,6 +286,10 @@ socket.on('milestoneReached', (data) => {
 
 socket.on('themeUpdate', (data) => {
   applyTheme(data.theme);
+});
+
+socket.on('assetImagesUpdate', (data) => {
+  applyAssetImages(data.assetImages);
 });
 
 socket.on('timerTick', (data) => {

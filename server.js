@@ -66,6 +66,8 @@ const nomAlertsClient = axios.create({
 const MILESTONES_FILE = path.join(__dirname, 'milestones.json');
 const DONATION_TIERS_FILE = path.join(__dirname, 'public', 'donation-tiers.json');
 const SOUNDS_DIR = path.join(__dirname, 'public', 'Assets', 'Sounds');
+const ASSET_IMAGES_FILE = path.join(__dirname, 'public', 'asset-images.json');
+const IMAGES_DIR = path.join(__dirname, 'public', 'Assets', 'Images');
 
 function loadMilestones() {
   try {
@@ -117,6 +119,34 @@ function loadDonationTiers() {
     return [];
   }
 }
+
+// asset-images.json lives in public/ (like donation-tiers.json) because the
+// unauthenticated overlay itself needs to fetch it client-side to know
+// which QR/logo images to display -- it's a manifest of asset id -> file
+// path, not sensitive data.
+function loadAssetImages() {
+  try {
+    const raw = fs.readFileSync(ASSET_IMAGES_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('asset-images.json must be a JSON array');
+    return parsed;
+  } catch (err) {
+    console.warn(`[admin] could not read asset-images.json (${err.message})`);
+    return [];
+  }
+}
+
+function saveAssetImages(list) {
+  fs.writeFileSync(ASSET_IMAGES_FILE, JSON.stringify(list, null, 2) + '\n');
+}
+
+const IMAGE_EXTENSIONS_BY_MIMETYPE = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+};
 
 // ---------------------------------------------------------------------------
 // Persisted runtime state — this overlay is meant to run unattended for
@@ -479,6 +509,7 @@ fetchInitialTheme().then(connectToAlertsThemeStream);
 // ---------------------------------------------------------------------------
 const adminTokens = new Set();
 const soundUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const imageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 function passwordMatches(candidate) {
   const a = Buffer.from(String(candidate));
@@ -658,6 +689,49 @@ app.post('/admin/upload-sound', requireAdminAuth, soundUpload.single('file'), (r
 
   console.log(`[admin] uploaded sound for ${tierId}: ${destPath} (${req.file.size} bytes)`);
   res.json({ ok: true, tier: tierId, path: tier.sound });
+});
+
+// -- Image upload for QR code / logo asset boxes --
+app.post('/admin/upload-image', requireAdminAuth, imageUpload.single('file'), (req, res) => {
+  const assetId = req.body && req.body.asset;
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  const ext = IMAGE_EXTENSIONS_BY_MIMETYPE[req.file.mimetype];
+  if (!ext) {
+    return res.status(400).json({ error: 'File must be a PNG, JPEG, GIF, WebP, or SVG image' });
+  }
+
+  const assetImages = loadAssetImages();
+  const asset = assetImages.find((a) => a.id === assetId);
+  if (!asset) {
+    return res.status(400).json({ error: `Unknown asset "${assetId}"` });
+  }
+
+  // path.basename strips any directory traversal even though assetId is
+  // already checked against the known asset-images.json ids above --
+  // belt-and-suspenders against a malformed/malicious id.
+  const safeId = path.basename(assetId);
+  fs.mkdirSync(IMAGES_DIR, { recursive: true });
+
+  // Remove any previous file for this asset under a different extension
+  // (e.g. re-uploading a .png after a .jpg) so stale files don't linger.
+  for (const existing of fs.readdirSync(IMAGES_DIR)) {
+    if (existing.startsWith(`${safeId}.`)) {
+      fs.unlinkSync(path.join(IMAGES_DIR, existing));
+    }
+  }
+
+  const filename = `${safeId}.${ext}`;
+  fs.writeFileSync(path.join(IMAGES_DIR, filename), req.file.buffer);
+
+  const relativePath = `Assets/Images/${filename}`;
+  asset.file = relativePath;
+  saveAssetImages(assetImages);
+
+  console.log(`[admin] uploaded image for ${assetId}: ${filename} (${req.file.size} bytes)`);
+  io.emit('assetImagesUpdate', { assetImages });
+  res.json({ ok: true, asset: assetId, path: relativePath });
 });
 
 // ---------------------------------------------------------------------------
