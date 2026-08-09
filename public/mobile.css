@@ -12,27 +12,28 @@ html, body {
 }
 
 /* --------------------------------------------------------------------------
-   Donation alert — dropped lower than the 1920x1080 layout's top:60px so it
-   clears the asset corner boxes instead of overlapping them (the alert can
-   be up to 900px wide, which leaves little clearance on a 1080px canvas).
+   Donation alert — dropped below the quest board (which now lives in the
+   upper-left) so a wide tier3 alert doesn't cover the timer/goal/hero stack.
    -------------------------------------------------------------------------- */
 .alert-box {
-  top: 190px;
+  top: 620px;
 }
 
 /* --------------------------------------------------------------------------
-   Quest board — stacked vertically (timer, then goal, then latest hero)
-   instead of three side-by-side panels, since there isn't the horizontal
-   room for that on a portrait canvas.
+   Quest board — stacked vertically in the upper-left corner (timer, then
+   goal, then latest hero), narrower than full-width since it's no longer
+   spanning the bottom of the screen.
    -------------------------------------------------------------------------- */
 .quest-board {
+  top: 32px;
   left: 32px;
-  right: 32px;
-  bottom: 32px;
+  right: auto;
+  bottom: auto;
+  width: 420px;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  gap: 20px;
+  gap: 16px;
 }
 
 .timer-section,
@@ -52,41 +53,37 @@ html, body {
 }
 
 .timer {
-  font-size: 72px;
+  font-size: 48px;
 }
 
 #goal-text {
-  font-size: 24px;
+  font-size: 16px;
   white-space: normal;
 }
 
 .goal-bar-track {
-  height: 32px;
-  border-radius: 16px;
+  height: 20px;
+  border-radius: 10px;
 }
 
 .latest-hero {
-  font-size: 28px;
+  font-size: 19px;
   white-space: normal;
 }
 
 .quest-board.minimized .timer {
-  font-size: 34px;
+  font-size: 30px;
 }
 
 .quest-board.minimized #goal-text {
-  font-size: 16px;
+  font-size: 13px;
 }
 
 /* --------------------------------------------------------------------------
-   Next milestone callout — needs to clear the whole stacked quest board
-   (much taller now than the single-row 1920x1080 layout), so it sits
-   higher up rather than just above one bar.
+   Next milestone callout — the bottom of the screen is empty now that the
+   quest board moved to the upper-left, so the default bottom-center
+   position from style.css works fine unmodified.
    -------------------------------------------------------------------------- */
-.next-milestone {
-  bottom: 420px;
-}
-
 .next-milestone-text {
   max-width: 300px;
 }
