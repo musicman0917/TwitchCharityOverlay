@@ -163,12 +163,15 @@ portal is adding/removing a sound):
 
 - A donation's tier is whichever entry has the highest `minAmount` that's still ≤ the amount
   donated — edit the amounts/count/duration freely, no code changes needed.
-- **Each tier can have multiple sounds** — `sounds` is an array, and the overlay picks one at
-  random every time an alert of that tier fires (`pickRandomSound()` in `public/script.js`).
-  Manage them through the admin portal's **Donation Alert Sounds** panel: "Add Sound" appends
-  a new one (server-generated filename, so uploading never overwrites an existing sound), each
-  sound has its own "▶ Play" preview and "Remove" button. Changes broadcast live to any open
-  overlay via a `donationTiersUpdate` socket event — no restart or reload needed.
+- **Each tier can have multiple sounds** — `sounds` is an array of `{path, name}` objects
+  (`name` is the original filename you uploaded, shown in the admin panel instead of the
+  meaningless server-generated storage filename), and the overlay picks one at random every
+  time an alert of that tier fires (`pickRandomSound()` in `public/script.js`). Manage them
+  through the admin portal's **Donation Alert Sounds** panel: the file picker supports
+  **selecting multiple files at once** (one upload click adds all of them in a single
+  request), each sound has its own "▶ Play" preview and "Remove" button, and uploading never
+  overwrites an existing sound (server-generated filename per file). Changes broadcast live to
+  any open overlay via a `donationTiersUpdate` socket event — no restart or reload needed.
 - **Sound files go in `public/Assets/Sounds/`** (see the README there) — until a tier has at
   least one sound, missing sounds fail silently (no console errors, no broken overlay), so
   it's safe to deploy before you have final audio.

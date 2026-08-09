@@ -1,5 +1,5 @@
 [
-  { "id": "tier1", "label": "Small Donation", "minAmount": 1, "durationMs": 5000, "sounds": ["Assets/Sounds/donation-tier-1.mp3"] },
-  { "id": "tier2", "label": "Medium Donation", "minAmount": 25, "durationMs": 6500, "sounds": ["Assets/Sounds/donation-tier-2.mp3"] },
-  { "id": "tier3", "label": "Large Donation", "minAmount": 100, "durationMs": 8000, "sounds": ["Assets/Sounds/donation-tier-3.mp3"] }
+  { "id": "tier1", "label": "Small Donation", "minAmount": 1, "durationMs": 5000, "sounds": [{ "path": "Assets/Sounds/donation-tier-1.mp3", "name": "donation-tier-1.mp3" }] },
+  { "id": "tier2", "label": "Medium Donation", "minAmount": 25, "durationMs": 6500, "sounds": [{ "path": "Assets/Sounds/donation-tier-2.mp3", "name": "donation-tier-2.mp3" }] },
+  { "id": "tier3", "label": "Large Donation", "minAmount": 100, "durationMs": 8000, "sounds": [{ "path": "Assets/Sounds/donation-tier-3.mp3", "name": "donation-tier-3.mp3" }] }
 ]

@@ -108,17 +108,33 @@ function saveMilestones(newMilestones) {
   return milestones;
 }
 
+// Each sound is normalized to { path, name } -- `name` is the original
+// uploaded filename (e.g. "cash-register.mp3"), shown in the admin portal
+// instead of the meaningless server-generated storage filename. Handles
+// both older formats: a bare string (pre-{path,name} support) and a
+// singular `sound` string (pre-multi-sound-per-tier support).
+function normalizeSounds(sounds) {
+  if (!Array.isArray(sounds)) return [];
+  return sounds
+    .map((s) => {
+      if (typeof s === 'string' && s) return { path: s, name: path.basename(s) };
+      if (s && typeof s.path === 'string' && s.path) {
+        return { path: s.path, name: typeof s.name === 'string' && s.name ? s.name : path.basename(s.path) };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
 function loadDonationTiers() {
   try {
     const raw = fs.readFileSync(DONATION_TIERS_FILE, 'utf8');
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) throw new Error('donation-tiers.json must be a JSON array');
-    // Normalize: configs from before multi-sound-per-tier support may still
-    // have a singular `sound` string instead of a `sounds` array.
     return parsed.map((tier) => {
-      if (Array.isArray(tier.sounds)) return tier;
-      const { sound, ...rest } = tier;
-      return { ...rest, sounds: typeof sound === 'string' && sound ? [sound] : [] };
+      const { sound, sounds, ...rest } = tier;
+      const source = Array.isArray(sounds) ? sounds : (typeof sound === 'string' && sound ? [sound] : []);
+      return { ...rest, sounds: normalizeSounds(source) };
     });
   } catch (err) {
     console.warn(`[admin] could not read donation-tiers.json (${err.message})`);
@@ -687,16 +703,17 @@ app.post('/admin/milestones', requireAdminAuth, (req, res) => {
 
 // -- Sound upload for donation tiers -- each tier can have multiple sounds;
 // the overlay picks one at random per alert (see playDonationSound() in
-// public/script.js). Uploading always ADDS a new sound to the tier rather
-// than replacing one, since there's no longer a single fixed file per tier.
-app.post('/admin/upload-sound', requireAdminAuth, soundUpload.single('file'), (req, res) => {
+// public/script.js). Uploading always ADDS sound(s) to the tier rather than
+// replacing one, since there's no longer a single fixed file per tier.
+// Accepts multiple files in one request (batch upload) -- each is
+// processed independently so one bad file doesn't block the rest, and the
+// whole batch is written to donation-tiers.json in a single save (avoids
+// the read-modify-write race a series of separate requests could hit).
+app.post('/admin/upload-sound', requireAdminAuth, soundUpload.array('files', 20), (req, res) => {
   const tierId = req.body && req.body.tier;
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-  const ext = AUDIO_EXTENSIONS_BY_MIMETYPE[req.file.mimetype];
-  if (!ext) {
-    return res.status(400).json({ error: 'File must be an MP3, WAV, OGG, M4A, or WebM audio file' });
+  const files = req.files || [];
+  if (!files.length) {
+    return res.status(400).json({ error: 'No files uploaded' });
   }
 
   const tiers = loadDonationTiers();
@@ -705,23 +722,36 @@ app.post('/admin/upload-sound', requireAdminAuth, soundUpload.single('file'), (r
     return res.status(400).json({ error: `Unknown tier "${tierId}"` });
   }
 
-  // Filename is entirely server-generated (known tier id + random suffix),
-  // never derived from the uploaded file's own name or other request
-  // input, so there's no path-traversal surface.
   const safeTierId = path.basename(tierId);
-  const suffix = crypto.randomBytes(4).toString('hex');
-  const filename = `donation-tier-${safeTierId}-${suffix}.${ext}`;
+  const errors = [];
+  let addedCount = 0;
 
   fs.mkdirSync(SOUNDS_DIR, { recursive: true });
-  fs.writeFileSync(path.join(SOUNDS_DIR, filename), req.file.buffer);
 
-  const relativePath = `Assets/Sounds/${filename}`;
-  tier.sounds.push(relativePath);
+  for (const file of files) {
+    const ext = AUDIO_EXTENSIONS_BY_MIMETYPE[file.mimetype];
+    if (!ext) {
+      errors.push({ name: file.originalname, error: 'Must be an MP3, WAV, OGG, M4A, or WebM audio file' });
+      continue;
+    }
+
+    // Storage filename is entirely server-generated (known tier id +
+    // random suffix), never derived from the uploaded file's own name or
+    // other request input, so there's no path-traversal surface. The
+    // original filename is kept separately just as a display label.
+    const suffix = crypto.randomBytes(4).toString('hex');
+    const filename = `donation-tier-${safeTierId}-${suffix}.${ext}`;
+    fs.writeFileSync(path.join(SOUNDS_DIR, filename), file.buffer);
+
+    tier.sounds.push({ path: `Assets/Sounds/${filename}`, name: file.originalname || filename });
+    addedCount += 1;
+  }
+
   saveDonationTiers(tiers);
 
-  console.log(`[admin] added sound for ${tierId}: ${filename} (${req.file.size} bytes, ${tier.sounds.length} total)`);
+  console.log(`[admin] added ${addedCount}/${files.length} sound(s) for ${tierId} (${tier.sounds.length} total)`);
   io.emit('donationTiersUpdate', { donationTiers: tiers });
-  res.json({ ok: true, tier: tierId, path: relativePath, sounds: tier.sounds });
+  res.json({ ok: true, tier: tierId, sounds: tier.sounds, added: addedCount, errors });
 });
 
 app.post('/admin/remove-sound', requireAdminAuth, (req, res) => {
@@ -731,11 +761,11 @@ app.post('/admin/remove-sound', requireAdminAuth, (req, res) => {
 
   const tiers = loadDonationTiers();
   const tier = tiers.find((t) => t.id === tierId);
-  if (!tier || !tier.sounds.includes(soundPath)) {
+  if (!tier || !tier.sounds.some((s) => s.path === soundPath)) {
     return res.status(400).json({ error: 'Unknown tier or sound' });
   }
 
-  tier.sounds = tier.sounds.filter((s) => s !== soundPath);
+  tier.sounds = tier.sounds.filter((s) => s.path !== soundPath);
   saveDonationTiers(tiers);
 
   // soundPath came from donation-tiers.json (only ever populated by our own

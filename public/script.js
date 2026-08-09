@@ -185,7 +185,10 @@ function getTierForAmount(amount) {
 function pickRandomSound(tier) {
   const sounds = tier.sounds;
   if (!Array.isArray(sounds) || sounds.length === 0) return null;
-  return sounds[Math.floor(Math.random() * sounds.length)];
+  const chosen = sounds[Math.floor(Math.random() * sounds.length)];
+  // Sounds are { path, name } objects; tolerate a bare string too in case
+  // an older cached donation-tiers.json is still being served somewhere.
+  return typeof chosen === 'string' ? chosen : chosen.path;
 }
 
 // --------------------------------------------------------------------------
