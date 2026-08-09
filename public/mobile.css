@@ -1,0 +1,101 @@
+/* ==========================================================================
+   Vertical/mobile layout overrides — loaded after style.css, which still
+   supplies the theme color variables (:root / :root[data-theme='disney'])
+   and most component styling untouched. This file only repositions/resizes
+   things for a 1080x1920 OBS Browser Source (portrait canvas) instead of
+   the standard 1920x1080 one.
+   ========================================================================== */
+
+html, body {
+  width: 1080px;
+  height: 1920px;
+}
+
+/* --------------------------------------------------------------------------
+   Donation alert — dropped lower than the 1920x1080 layout's top:60px so it
+   clears the asset corner boxes instead of overlapping them (the alert can
+   be up to 900px wide, which leaves little clearance on a 1080px canvas).
+   -------------------------------------------------------------------------- */
+.alert-box {
+  top: 190px;
+}
+
+/* --------------------------------------------------------------------------
+   Quest board — stacked vertically (timer, then goal, then latest hero)
+   instead of three side-by-side panels, since there isn't the horizontal
+   room for that on a portrait canvas.
+   -------------------------------------------------------------------------- */
+.quest-board {
+  left: 32px;
+  right: 32px;
+  bottom: 32px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 20px;
+}
+
+.timer-section,
+.goal-section,
+.hero-section {
+  flex: none;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.quest-label,
+.timer,
+#goal-text,
+.latest-hero {
+  text-align: center;
+}
+
+.timer {
+  font-size: 72px;
+}
+
+#goal-text {
+  font-size: 24px;
+  white-space: normal;
+}
+
+.goal-bar-track {
+  height: 32px;
+  border-radius: 16px;
+}
+
+.latest-hero {
+  font-size: 28px;
+  white-space: normal;
+}
+
+.quest-board.minimized .timer {
+  font-size: 34px;
+}
+
+.quest-board.minimized #goal-text {
+  font-size: 16px;
+}
+
+/* --------------------------------------------------------------------------
+   Next milestone callout — needs to clear the whole stacked quest board
+   (much taller now than the single-row 1920x1080 layout), so it sits
+   higher up rather than just above one bar.
+   -------------------------------------------------------------------------- */
+.next-milestone {
+  bottom: 420px;
+}
+
+.next-milestone-text {
+  max-width: 300px;
+}
+
+/* --------------------------------------------------------------------------
+   Milestone alert — same fixed width works fine centered on a 1080-wide
+   canvas, just tightened slightly so it doesn't crowd the edges.
+   -------------------------------------------------------------------------- */
+.milestone-alert-inner {
+  width: 860px;
+  padding: 48px 40px;
+}

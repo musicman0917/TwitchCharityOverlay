@@ -132,6 +132,16 @@ pm2 logs nom-charity-overlay
 5. Refreshing the browser source is safe at any time: on connect, the server immediately
    sends the current timer, total raised, and latest donor so nothing resets.
 
+## Vertical / mobile overlay
+
+`http://localhost:3011/mobile.html` is a second overlay page for a portrait (9:16) OBS
+scene — e.g. a vertical stream layout for TikTok/Instagram, or any scene where the
+1920x1080 horizontal layout doesn't fit. It's driven by the exact same backend and
+`script.js` as the main overlay (same Socket.io events, same donation tiers, milestones,
+theme, and asset images), just re-laid-out: the Timer/Goal/Latest Hero panels stack
+vertically instead of sitting side by side. Add it as a Browser Source the same way, but
+set width `1080` and height `1920`.
+
 ## Clip-friendly layout
 
 The bottom bar is deliberately **three separate panels** (Timer, Goal, Latest Hero) with real
