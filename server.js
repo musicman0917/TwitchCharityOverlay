@@ -113,11 +113,21 @@ function loadDonationTiers() {
     const raw = fs.readFileSync(DONATION_TIERS_FILE, 'utf8');
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) throw new Error('donation-tiers.json must be a JSON array');
-    return parsed;
+    // Normalize: configs from before multi-sound-per-tier support may still
+    // have a singular `sound` string instead of a `sounds` array.
+    return parsed.map((tier) => {
+      if (Array.isArray(tier.sounds)) return tier;
+      const { sound, ...rest } = tier;
+      return { ...rest, sounds: typeof sound === 'string' && sound ? [sound] : [] };
+    });
   } catch (err) {
     console.warn(`[admin] could not read donation-tiers.json (${err.message})`);
     return [];
   }
+}
+
+function saveDonationTiers(list) {
+  fs.writeFileSync(DONATION_TIERS_FILE, JSON.stringify(list, null, 2) + '\n');
 }
 
 // asset-images.json lives in public/ (like donation-tiers.json) because the
@@ -146,6 +156,18 @@ const IMAGE_EXTENSIONS_BY_MIMETYPE = {
   'image/gif': 'gif',
   'image/webp': 'webp',
   'image/svg+xml': 'svg',
+};
+
+const AUDIO_EXTENSIONS_BY_MIMETYPE = {
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/wave': 'wav',
+  'audio/ogg': 'ogg',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/webm': 'webm',
 };
 
 // ---------------------------------------------------------------------------
@@ -663,32 +685,68 @@ app.post('/admin/milestones', requireAdminAuth, (req, res) => {
   res.json({ ok: true, milestones: serializeMilestones() });
 });
 
-// -- Sound upload for donation tiers --
+// -- Sound upload for donation tiers -- each tier can have multiple sounds;
+// the overlay picks one at random per alert (see playDonationSound() in
+// public/script.js). Uploading always ADDS a new sound to the tier rather
+// than replacing one, since there's no longer a single fixed file per tier.
 app.post('/admin/upload-sound', requireAdminAuth, soundUpload.single('file'), (req, res) => {
   const tierId = req.body && req.body.tier;
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
-  if (!req.file.mimetype || !req.file.mimetype.startsWith('audio/')) {
-    return res.status(400).json({ error: 'File must be an audio file' });
+  const ext = AUDIO_EXTENSIONS_BY_MIMETYPE[req.file.mimetype];
+  if (!ext) {
+    return res.status(400).json({ error: 'File must be an MP3, WAV, OGG, M4A, or WebM audio file' });
   }
 
   const tiers = loadDonationTiers();
   const tier = tiers.find((t) => t.id === tierId);
-  if (!tier || typeof tier.sound !== 'string') {
+  if (!tier) {
     return res.status(400).json({ error: `Unknown tier "${tierId}"` });
   }
 
-  // Destination is derived only from the filename portion of the
-  // server-controlled donation-tiers.json entry (never from user input or
-  // the uploaded file's own name), so this can't write outside SOUNDS_DIR.
-  const destPath = path.join(SOUNDS_DIR, path.basename(tier.sound));
+  // Filename is entirely server-generated (known tier id + random suffix),
+  // never derived from the uploaded file's own name or other request
+  // input, so there's no path-traversal surface.
+  const safeTierId = path.basename(tierId);
+  const suffix = crypto.randomBytes(4).toString('hex');
+  const filename = `donation-tier-${safeTierId}-${suffix}.${ext}`;
 
   fs.mkdirSync(SOUNDS_DIR, { recursive: true });
-  fs.writeFileSync(destPath, req.file.buffer);
+  fs.writeFileSync(path.join(SOUNDS_DIR, filename), req.file.buffer);
 
-  console.log(`[admin] uploaded sound for ${tierId}: ${destPath} (${req.file.size} bytes)`);
-  res.json({ ok: true, tier: tierId, path: tier.sound });
+  const relativePath = `Assets/Sounds/${filename}`;
+  tier.sounds.push(relativePath);
+  saveDonationTiers(tiers);
+
+  console.log(`[admin] added sound for ${tierId}: ${filename} (${req.file.size} bytes, ${tier.sounds.length} total)`);
+  io.emit('donationTiersUpdate', { donationTiers: tiers });
+  res.json({ ok: true, tier: tierId, path: relativePath, sounds: tier.sounds });
+});
+
+app.post('/admin/remove-sound', requireAdminAuth, (req, res) => {
+  const body = req.body || {};
+  const tierId = body.tier;
+  const soundPath = body.sound;
+
+  const tiers = loadDonationTiers();
+  const tier = tiers.find((t) => t.id === tierId);
+  if (!tier || !tier.sounds.includes(soundPath)) {
+    return res.status(400).json({ error: 'Unknown tier or sound' });
+  }
+
+  tier.sounds = tier.sounds.filter((s) => s !== soundPath);
+  saveDonationTiers(tiers);
+
+  // soundPath came from donation-tiers.json (only ever populated by our own
+  // upload handler above), and path.basename strips any traversal attempt
+  // regardless, so this stays confined to SOUNDS_DIR.
+  const filePath = path.join(SOUNDS_DIR, path.basename(soundPath));
+  fs.rm(filePath, { force: true }, () => {}); // best-effort; JSON is the source of truth either way
+
+  console.log(`[admin] removed sound for ${tierId}: ${soundPath} (${tier.sounds.length} remaining)`);
+  io.emit('donationTiersUpdate', { donationTiers: tiers });
+  res.json({ ok: true, tier: tierId, sounds: tier.sounds });
 });
 
 // -- Image upload for QR code / logo asset boxes --

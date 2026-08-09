@@ -148,23 +148,30 @@ window into a solid card rather than a broken edge.
 ## Donation alert tiers + sound
 
 Larger donations get a bigger, longer, more glowing "A New Hero Approaches!" alert, plus a
-distinct sound. Thresholds, per-tier duration, and sound file paths are configured in
+sound. Thresholds, per-tier duration, and each tier's sound files are configured in
 `public/donation-tiers.json` (a purely client-side/presentational config — unlike
-`milestones.json`, the backend doesn't need to know about tiers at all):
+`milestones.json`, the backend doesn't need to know about tiers at all except when the admin
+portal is adding/removing a sound):
 
 ```json
 [
-  { "id": "tier1", "label": "Small Donation", "minAmount": 1, "durationMs": 5000, "sound": "Assets/Sounds/donation-tier-1.mp3" },
-  { "id": "tier2", "label": "Medium Donation", "minAmount": 25, "durationMs": 6500, "sound": "Assets/Sounds/donation-tier-2.mp3" },
-  { "id": "tier3", "label": "Large Donation", "minAmount": 100, "durationMs": 8000, "sound": "Assets/Sounds/donation-tier-3.mp3" }
+  { "id": "tier1", "label": "Small Donation", "minAmount": 1, "durationMs": 5000, "sounds": ["Assets/Sounds/donation-tier-1.mp3"] },
+  { "id": "tier2", "label": "Medium Donation", "minAmount": 25, "durationMs": 6500, "sounds": ["Assets/Sounds/donation-tier-2.mp3"] },
+  { "id": "tier3", "label": "Large Donation", "minAmount": 100, "durationMs": 8000, "sounds": ["Assets/Sounds/donation-tier-3.mp3"] }
 ]
 ```
 
 - A donation's tier is whichever entry has the highest `minAmount` that's still ≤ the amount
   donated — edit the amounts/count/duration freely, no code changes needed.
-- **Sound files go in `public/Assets/Sounds/`** (see the README there) — until you drop real
-  files in, missing sounds fail silently (no console errors, no broken overlay), so it's safe
-  to deploy before you have final audio.
+- **Each tier can have multiple sounds** — `sounds` is an array, and the overlay picks one at
+  random every time an alert of that tier fires (`pickRandomSound()` in `public/script.js`).
+  Manage them through the admin portal's **Donation Alert Sounds** panel: "Add Sound" appends
+  a new one (server-generated filename, so uploading never overwrites an existing sound), each
+  sound has its own "▶ Play" preview and "Remove" button. Changes broadcast live to any open
+  overlay via a `donationTiersUpdate` socket event — no restart or reload needed.
+- **Sound files go in `public/Assets/Sounds/`** (see the README there) — until a tier has at
+  least one sound, missing sounds fail silently (no console errors, no broken overlay), so
+  it's safe to deploy before you have final audio.
 - Visual escalation (bigger card, thicker gold border, stronger/pulsing glow, larger text) is
   fixed in `public/style.css` under the `.alert-box.tier2` / `.alert-box.tier3` rules — these
   aren't in the JSON since they're a design choice, not something you'd want to reconfigure
@@ -266,13 +273,15 @@ What it can do:
   `milestones.json`. Saving rewrites the file and silently recomputes which milestones count as
   already-reached against the current total (same baseline logic as a server restart — no alert
   spam from an edit).
-- **Sound upload** — replace the tier1/tier2/tier3 donation alert sound files directly from the
-  browser instead of copying files onto the server by hand. Takes effect immediately, no
-  restart needed (the overlay fetches sound files fresh each time an alert fires).
+- **Sound upload** — add or remove donation alert sounds per tier directly from the browser,
+  each with a play-preview button; the overlay picks one at random per alert (see "Donation
+  alert tiers + sound" above). Takes effect immediately, no restart needed.
+- **Asset images** — upload the QR code and logo images for the top-right overlay boxes (see
+  "Asset images" above), same immediate-effect, no-restart pattern.
 
 All of this is backed by a small `/admin/*` API in `server.js`, protected by
 `requireAdminAuth` (checks a `Bearer <token>` header issued by `POST /admin/login`) on every
-route except the login itself. File uploads are validated (`audio/*` mimetype, 10MB limit)
+route except the login itself. File uploads are validated (audio/image mimetype, size limits)
 and always written to a server-controlled path derived from `donation-tiers.json` — the
 uploaded filename and the `tier` field are never used to build a filesystem path, so there's
 no path-traversal risk from a malformed request.

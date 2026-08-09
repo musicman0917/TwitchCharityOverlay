@@ -1,12 +1,12 @@
 # Donation alert sounds
 
-Drop your donation alert sound effects here, named to match `donation-tiers.json`:
+Upload sound effects through the admin portal's "Donation Alert Sounds" panel
+(`/admin.html`) — each tier (small/medium/large donation) can have **multiple** sounds, and
+the overlay picks one at random each time an alert of that tier fires. Uploaded files land
+here as `donation-tier-<tierId>-<random>.<ext>`, tracked in `public/donation-tiers.json`'s
+`sounds` array per tier. Use the admin panel to add or remove sounds — don't rename/delete
+files directly in this folder, since the JSON manifest needs to stay in sync.
 
-- `donation-tier-1.mp3` — small donations ($1–$24)
-- `donation-tier-2.mp3` — medium donations ($25–$99)
-- `donation-tier-3.mp3` — large donations ($100+)
-
-Until real files exist here, the overlay just silently skips playback (no errors, no
-console spam) — see `playDonationSound()` in `public/script.js`. Change the file names,
-thresholds, or per-tier duration in `public/donation-tiers.json` any time; no code changes
-needed. Supported formats: anything the browser's `<audio>` element supports (mp3, wav, ogg).
+Until a tier has at least one sound, the overlay just silently skips playback (no errors, no
+console spam) — see `playDonationSound()` in `public/script.js`. Supported formats: mp3, wav,
+ogg, m4a, webm.
