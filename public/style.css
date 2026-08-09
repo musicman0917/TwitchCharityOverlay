@@ -270,7 +270,7 @@ html, body {
     );
   border-top: 6px solid var(--deep-border);
   box-shadow: 0 -10px 30px var(--shadow), inset 0 3px 0 var(--glow-board-top);
-  transition: background 0.4s ease, border-color 0.4s ease;
+  transition: height 0.5s ease, background 0.4s ease, border-color 0.4s ease;
 }
 
 .quest-board-inner {
@@ -430,6 +430,52 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   transition: color 0.4s ease;
+}
+
+/* --------------------------------------------------------------------------
+   Minimized quest board — while the timer is paused (e.g. the lead-up
+   period before a stream), the board shrinks down to just the essentials
+   (timer + goal) instead of taking up its full on-stream footprint.
+   -------------------------------------------------------------------------- */
+.quest-board.minimized {
+  height: 76px;
+}
+
+.quest-board.minimized .quest-board-inner {
+  margin: 8px 32px;
+  padding: 8px 24px;
+}
+
+.quest-board.minimized .hero-section,
+.quest-board.minimized .goal-bar-markers {
+  display: none;
+}
+
+.quest-board.minimized .timer-section {
+  min-width: 0;
+  padding-right: 20px;
+}
+
+.quest-board.minimized .quest-label {
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.quest-board.minimized .timer {
+  font-size: 26px;
+}
+
+.quest-board.minimized .timer.paused::after {
+  display: none;
+}
+
+.quest-board.minimized #goal-text {
+  font-size: 14px;
+}
+
+.quest-board.minimized .goal-bar-track {
+  height: 14px;
+  border-radius: 7px;
 }
 
 /* --------------------------------------------------------------------------

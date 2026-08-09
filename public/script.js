@@ -1,5 +1,6 @@
 const socket = io();
 
+const questBoardEl = document.getElementById('quest-board');
 const timerEl = document.getElementById('timer');
 const goalTextEl = document.getElementById('goal-text');
 const goalBarFillEl = document.getElementById('goal-bar-fill');
@@ -50,6 +51,10 @@ function formatMoney(amount) {
 function updateTimer(seconds, paused) {
   timerEl.textContent = formatTimer(seconds);
   timerEl.classList.toggle('paused', !!paused);
+  // Shrink the whole quest board while paused (e.g. the lead-up period
+  // before a stream) so it takes up less screen space when it's not
+  // actively counting down.
+  questBoardEl.classList.toggle('minimized', !!paused);
 }
 
 function updateGoal(totalRaised) {

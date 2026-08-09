@@ -241,8 +241,11 @@ What it can do:
 - **Timer controls** — set the base timer duration (hours), pause/resume the countdown, nudge
   it by ±1/±10 minutes or a custom number of seconds, reset to the base duration, or schedule
   an exact date/time for it to auto-resume (handy for a stream announced weeks out — see "How
-  the donothon timer works" above). A paused timer shows a "⏸ PAUSED" indicator on the overlay
-  itself so it's clear on-stream that it's intentional, not frozen/broken.
+  the donothon timer works" above). A paused timer shows a "⏸ PAUSED" indicator, and the
+  bottom quest board itself shrinks down to just the timer and goal bar (dropping "Latest
+  Hero" and the milestone tick marks) — it's meant to sit paused for days/weeks before a
+  stream without eating screen space the whole time, then expands back to full size the
+  moment it starts running.
 - **Test alerts** — fire a donation alert (any name/amount, exercises the tier system) or a
   milestone alert (any amount/label) on demand. These are visual/audio previews only — they
   never touch the real timer, `totalRaised`, or the "Latest Hero" display, so testing mid-stream
