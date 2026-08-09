@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Charity Overlay — Admin</title>
+<style>
+  :root {
+    --bg: #16100a;
+    --panel: #221a12;
+    --panel-border: #3a2c1c;
+    --text: #f1e3c6;
+    --muted: #b3a389;
+    --gold: #d4a94e;
+    --gold-bright: #f2c766;
+    --danger: #c85c4a;
+    --success: #6ba86b;
+    --input-bg: #120d08;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 24px;
+  }
+
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 24px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    max-width: 720px;
+  }
+
+  .panel h2 {
+    font-size: 15px;
+    margin: 0 0 14px;
+    color: var(--gold-bright);
+    letter-spacing: 0.03em;
+  }
+
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  input[type="text"], input[type="number"], input[type="password"] {
+    background: var(--input-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 8px 10px;
+    font-size: 14px;
+    width: 100%;
+  }
+
+  input[type="file"] {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  button {
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+    color: #241811;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  button:hover { filter: brightness(1.08); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  button.secondary {
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+  }
+
+  button.danger {
+    background: var(--danger);
+    color: #fff;
+  }
+
+  .row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .row > div { flex: 1 1 auto; min-width: 120px; }
+
+  .status-line {
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .status-line strong { color: var(--gold-bright); }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .pill.running { background: rgba(107, 168, 107, 0.2); color: var(--success); }
+  .pill.paused { background: rgba(200, 92, 74, 0.2); color: var(--danger); }
+
+  .milestone-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .milestone-row input[type="text"] { flex: 1 1 auto; }
+  .milestone-row input[type="number"] { width: 110px; flex: 0 0 auto; }
+
+  .tier-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .tier-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .tier-row .tier-label { width: 130px; flex: 0 0 auto; font-size: 13px; }
+  .tier-row .tier-file-name { font-size: 11px; color: var(--muted); }
+
+  .msg {
+    font-size: 12px;
+    margin-top: 8px;
+    min-height: 16px;
+  }
+
+  .msg.ok { color: var(--success); }
+  .msg.err { color: var(--danger); }
+
+  #login-screen {
+    max-width: 340px;
+    margin: 80px auto;
+    text-align: center;
+  }
+
+  #login-screen .panel { max-width: none; }
+
+  #dashboard { display: none; }
+  #dashboard.visible { display: block; }
+  #login-screen.hidden { display: none; }
+
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 720px;
+    margin-bottom: 8px;
+  }
+</style>
+</head>
+<body>
+
+  <div id="login-screen">
+    <h1>Charity Overlay Admin</h1>
+    <p class="subtitle">Enter the admin password to continue.</p>
+    <div class="panel">
+      <label for="login-password">Password</label>
+      <div class="row">
+        <div><input type="password" id="login-password" placeholder="Admin password" /></div>
+        <div style="flex: 0 0 auto;"><button id="login-btn">Log In</button></div>
+      </div>
+      <div class="msg err" id="login-msg"></div>
+    </div>
+  </div>
+
+  <div id="dashboard">
+    <div class="top-bar">
+      <div>
+        <h1>Charity Overlay Admin</h1>
+        <p class="subtitle">Dayton Children's Hospital donothon overlay controls</p>
+      </div>
+      <button class="secondary" id="logout-btn">Log Out</button>
+    </div>
+
+    <div class="panel">
+      <h2>Status</h2>
+      <div class="status-line">Timer: <strong id="status-timer">--:--:--</strong> <span class="pill" id="status-pill">—</span></div>
+      <div class="status-line">Total raised: <strong id="status-total">$0</strong></div>
+      <div class="status-line">Theme: <strong id="status-theme">—</strong></div>
+      <div class="status-line">Scheduled auto-resume: <strong id="status-schedule">None</strong></div>
+      <div class="status-line">Base timer duration: <strong id="status-base">--:--:--</strong></div>
+    </div>
+
+    <div class="panel">
+      <h2>Timer Controls</h2>
+
+      <div class="row">
+        <div>
+          <label for="base-hours">Base timer duration (hours) — what "Reset" returns the countdown to</label>
+          <input type="number" id="base-hours" step="0.5" min="0.5" placeholder="e.g. 4 or 8" />
+        </div>
+        <div style="flex: 0 0 auto;"><button id="base-save-btn" class="secondary">Save Base Duration</button></div>
+      </div>
+      <p class="subtitle" style="margin: 0 0 14px;">
+        Doesn't touch the currently running countdown — click Reset afterward if you want the
+        new base to apply right away.
+      </p>
+      <div class="msg" id="base-msg" style="margin-bottom: 14px;"></div>
+
+      <div class="row" style="border-top: 1px solid var(--panel-border); padding-top: 14px;">
+        <div><button id="pause-btn">Pause</button></div>
+        <div><button id="resume-btn" class="secondary">Resume</button></div>
+        <div><button id="reset-btn" class="danger">Reset</button></div>
+      </div>
+      <div class="row">
+        <div><button data-adjust="-600" class="secondary">-10 min</button></div>
+        <div><button data-adjust="-60" class="secondary">-1 min</button></div>
+        <div><button data-adjust="60" class="secondary">+1 min</button></div>
+        <div><button data-adjust="600" class="secondary">+10 min</button></div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="custom-seconds">Custom adjustment (seconds, negative to subtract)</label>
+          <input type="number" id="custom-seconds" placeholder="e.g. 120 or -120" />
+        </div>
+        <div style="flex: 0 0 auto;"><button id="custom-adjust-btn" class="secondary">Apply</button></div>
+      </div>
+      <div class="msg" id="timer-msg"></div>
+
+      <div class="row" style="margin-top: 16px; border-top: 1px solid var(--panel-border); padding-top: 14px;">
+        <div>
+          <label for="schedule-datetime">Auto-resume at (your local time)</label>
+          <input type="datetime-local" id="schedule-datetime" />
+        </div>
+        <div style="flex: 0 0 auto;"><button id="schedule-btn" class="secondary">Schedule Auto-Resume</button></div>
+        <div style="flex: 0 0 auto;"><button id="schedule-clear-btn" class="secondary">Clear Schedule</button></div>
+      </div>
+      <p class="subtitle" style="margin: 0;">
+        Pauses the timer now (if not already) and automatically resumes it at the exact
+        date/time above — useful for a countdown that sits up for days before the stream
+        without ticking down early. Resuming manually at any point cancels the schedule.
+      </p>
+      <div class="msg" id="schedule-msg"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Test Alerts</h2>
+      <p class="subtitle" style="margin-bottom: 12px;">Fires the visual/sound alert only — never touches the real timer, total, or "Latest Hero" display.</p>
+
+      <div class="row">
+        <div>
+          <label for="test-donor-name">Donor name</label>
+          <input type="text" id="test-donor-name" placeholder="TestDonor" />
+        </div>
+        <div>
+          <label for="test-donor-amount">Amount ($)</label>
+          <input type="number" id="test-donor-amount" placeholder="10" />
+        </div>
+        <div style="flex: 0 0 auto;"><button id="test-donation-btn">Fire Donation Alert</button></div>
+      </div>
+      <div class="msg" id="test-donation-msg"></div>
+
+      <div class="row" style="margin-top: 16px;">
+        <div>
+          <label for="test-milestone-amount">Milestone amount ($)</label>
+          <input type="number" id="test-milestone-amount" placeholder="500" />
+        </div>
+        <div>
+          <label for="test-milestone-label">Reward label</label>
+          <input type="text" id="test-milestone-label" placeholder="Milestone reward TBD" />
+        </div>
+        <div style="flex: 0 0 auto;"><button id="test-milestone-btn">Fire Milestone Alert</button></div>
+      </div>
+      <div class="msg" id="test-milestone-msg"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Milestones</h2>
+      <div id="milestone-rows"></div>
+      <div class="row">
+        <div style="flex: 0 0 auto;"><button class="secondary" id="add-milestone-btn">+ Add Milestone</button></div>
+        <div style="flex: 0 0 auto;"><button id="save-milestones-btn">Save Milestones</button></div>
+      </div>
+      <div class="msg" id="milestones-msg"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Donation Alert Sounds</h2>
+      <p class="subtitle" style="margin-bottom: 12px;">Uploads replace the mp3/wav file for that tier immediately — no restart needed.</p>
+      <div id="tier-rows"></div>
+      <div class="msg" id="sound-msg"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Asset Images</h2>
+      <p class="subtitle" style="margin-bottom: 12px;">
+        Upload the QR code and logo images for the top-right boxes on the overlay. PNG, JPEG,
+        GIF, WebP, or SVG — takes effect immediately, no restart needed.
+      </p>
+      <div id="asset-image-rows"></div>
+      <div class="msg" id="asset-image-msg"></div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const API_BASE = '';
+    let token = localStorage.getItem('adminToken') || '';
+
+    function authHeaders(extra) {
+      return Object.assign({ Authorization: `Bearer ${token}` }, extra || {});
+    }
+
+    async function apiFetch(path, opts) {
+      opts = opts || {};
+      opts.headers = authHeaders(opts.headers);
+      const res = await fetch(API_BASE + path, opts);
+      if (res.status === 401) {
+        showLogin('Session expired — please log in again.');
+        throw new Error('Unauthorized');
+      }
+      return res;
+    }
+
+    function showLogin(msg) {
+      token = '';
+      localStorage.removeItem('adminToken');
+      document.getElementById('dashboard').classList.remove('visible');
+      document.getElementById('login-screen').classList.remove('hidden');
+      document.getElementById('login-msg').textContent = msg || '';
+    }
+
+    function showDashboard() {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('dashboard').classList.add('visible');
+      refreshStatus();
+      loadMilestones();
+      loadTiers();
+      loadAssetImages();
+    }
+
+    document.getElementById('login-btn').addEventListener('click', async () => {
+      const password = document.getElementById('login-password').value;
+      const msgEl = document.getElementById('login-msg');
+      msgEl.textContent = '';
+      try {
+        const res = await fetch(API_BASE + '/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          msgEl.textContent = data.error || 'Login failed';
+          return;
+        }
+        token = data.token;
+        localStorage.setItem('adminToken', token);
+        showDashboard();
+      } catch (err) {
+        msgEl.textContent = `Could not reach server: ${err.message}`;
+      }
+    });
+
+    document.getElementById('login-password').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('login-btn').click();
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try { await apiFetch('/admin/logout', { method: 'POST' }); } catch {}
+      showLogin('');
+    });
+
+    function formatTimer(totalSeconds) {
+      const s = Math.max(0, Math.floor(totalSeconds));
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${pad(h)}:${pad(m)}:${pad(sec)}`;
+    }
+
+    function formatMoney(amount) {
+      return `$${Number(amount).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+    }
+
+    function renderScheduleStatus(scheduledStartAt) {
+      const el = document.getElementById('status-schedule');
+      el.textContent = scheduledStartAt
+        ? new Date(scheduledStartAt).toLocaleString()
+        : 'None';
+    }
+
+    function renderBaseStatus(baseSeconds) {
+      document.getElementById('status-base').textContent = formatTimer(baseSeconds);
+      const input = document.getElementById('base-hours');
+      if (document.activeElement !== input) {
+        input.value = baseSeconds / 3600;
+      }
+      document.getElementById('reset-btn').textContent = `Reset to ${formatTimer(baseSeconds)}`;
+    }
+
+    function renderStatus(state) {
+      document.getElementById('status-timer').textContent = formatTimer(state.currentTimer);
+      document.getElementById('status-total').textContent = formatMoney(state.totalRaised);
+      document.getElementById('status-theme').textContent = state.theme;
+      renderScheduleStatus(state.scheduledStartAt);
+      renderBaseStatus(state.baseSeconds);
+      const pill = document.getElementById('status-pill');
+      if (state.timerPaused) {
+        pill.textContent = 'PAUSED';
+        pill.className = 'pill paused';
+      } else {
+        pill.textContent = 'RUNNING';
+        pill.className = 'pill running';
+      }
+    }
+
+    async function refreshStatus() {
+      try {
+        const res = await apiFetch('/admin/state');
+        if (!res.ok) return;
+        renderStatus(await res.json());
+      } catch {}
+    }
+
+    // Live updates via the same socket.io feed the overlay uses, so the
+    // status panel doesn't need to poll.
+    const socket = io();
+    socket.on('state', renderStatus);
+    socket.on('timerTick', (data) => {
+      document.getElementById('status-timer').textContent = formatTimer(data.currentTimer);
+      const pill = document.getElementById('status-pill');
+      if (data.timerPaused) {
+        pill.textContent = 'PAUSED';
+        pill.className = 'pill paused';
+      } else {
+        pill.textContent = 'RUNNING';
+        pill.className = 'pill running';
+      }
+    });
+    socket.on('totalUpdate', (data) => {
+      document.getElementById('status-total').textContent = formatMoney(data.totalRaised);
+    });
+    socket.on('themeUpdate', (data) => {
+      document.getElementById('status-theme').textContent = data.theme;
+    });
+    socket.on('baseUpdate', (data) => {
+      renderBaseStatus(data.baseSeconds);
+    });
+    socket.on('milestonesUpdate', (data) => {
+      renderMilestoneRows(data.milestones);
+    });
+    socket.on('scheduleUpdate', (data) => {
+      renderScheduleStatus(data.scheduledStartAt);
+    });
+
+    // -- Timer controls --
+    async function setTimerMsg(text, ok) {
+      const el = document.getElementById('timer-msg');
+      el.textContent = text;
+      el.className = `msg ${ok ? 'ok' : 'err'}`;
+    }
+
+    document.getElementById('pause-btn').addEventListener('click', async () => {
+      const res = await apiFetch('/admin/timer/pause', { method: 'POST' });
+      setTimerMsg(res.ok ? 'Timer paused.' : 'Failed to pause timer.', res.ok);
+    });
+
+    document.getElementById('resume-btn').addEventListener('click', async () => {
+      const res = await apiFetch('/admin/timer/resume', { method: 'POST' });
+      setTimerMsg(res.ok ? 'Timer resumed.' : 'Failed to resume timer.', res.ok);
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', async () => {
+      const label = document.getElementById('status-base').textContent;
+      if (!confirm(`Reset the timer to ${label}? This cannot be undone.`)) return;
+      const res = await apiFetch('/admin/timer/reset', { method: 'POST' });
+      setTimerMsg(res.ok ? `Timer reset to ${label}.` : 'Failed to reset timer.', res.ok);
+    });
+
+    document.getElementById('base-save-btn').addEventListener('click', async () => {
+      const hours = Number(document.getElementById('base-hours').value);
+      const msgEl = document.getElementById('base-msg');
+      if (!Number.isFinite(hours) || hours <= 0) {
+        msgEl.textContent = 'Enter a positive number of hours.';
+        msgEl.className = 'msg err';
+        return;
+      }
+      const res = await apiFetch('/admin/timer/base', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hours }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        renderBaseStatus(data.baseSeconds);
+        msgEl.textContent = `Base duration set to ${formatTimer(data.baseSeconds)}.`;
+        msgEl.className = 'msg ok';
+      } else {
+        msgEl.textContent = 'Failed to set base duration.';
+        msgEl.className = 'msg err';
+      }
+    });
+
+    document.querySelectorAll('button[data-adjust]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const seconds = Number(btn.getAttribute('data-adjust'));
+        const res = await apiFetch('/admin/timer/adjust', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seconds }),
+        });
+        setTimerMsg(res.ok ? `Adjusted by ${seconds > 0 ? '+' : ''}${seconds}s.` : 'Failed to adjust timer.', res.ok);
+      });
+    });
+
+    document.getElementById('custom-adjust-btn').addEventListener('click', async () => {
+      const val = Number(document.getElementById('custom-seconds').value);
+      if (!Number.isFinite(val) || val === 0) {
+        setTimerMsg('Enter a non-zero number of seconds.', false);
+        return;
+      }
+      const res = await apiFetch('/admin/timer/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seconds: val }),
+      });
+      setTimerMsg(res.ok ? `Adjusted by ${val > 0 ? '+' : ''}${val}s.` : 'Failed to adjust timer.', res.ok);
+    });
+
+    document.getElementById('schedule-btn').addEventListener('click', async () => {
+      const val = document.getElementById('schedule-datetime').value;
+      const msgEl = document.getElementById('schedule-msg');
+      if (!val) {
+        msgEl.textContent = 'Pick a date/time first.';
+        msgEl.className = 'msg err';
+        return;
+      }
+      const iso = new Date(val).toISOString();
+      const res = await apiFetch('/admin/timer/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startAt: iso }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        renderScheduleStatus(data.scheduledStartAt);
+        msgEl.textContent = `Scheduled to auto-resume at ${new Date(data.scheduledStartAt).toLocaleString()}.`;
+        msgEl.className = 'msg ok';
+      } else {
+        msgEl.textContent = 'Failed to schedule auto-resume.';
+        msgEl.className = 'msg err';
+      }
+    });
+
+    document.getElementById('schedule-clear-btn').addEventListener('click', async () => {
+      const msgEl = document.getElementById('schedule-msg');
+      const res = await apiFetch('/admin/timer/schedule/clear', { method: 'POST' });
+      renderScheduleStatus(null);
+      msgEl.textContent = res.ok ? 'Schedule cleared.' : 'Failed to clear schedule.';
+      msgEl.className = `msg ${res.ok ? 'ok' : 'err'}`;
+    });
+
+    // -- Test alerts --
+    document.getElementById('test-donation-btn').addEventListener('click', async () => {
+      const name = document.getElementById('test-donor-name').value || 'TestDonor';
+      const amount = Number(document.getElementById('test-donor-amount').value);
+      const msgEl = document.getElementById('test-donation-msg');
+      if (!Number.isFinite(amount) || amount <= 0) {
+        msgEl.textContent = 'Enter a positive amount.';
+        msgEl.className = 'msg err';
+        return;
+      }
+      const res = await apiFetch('/admin/test/donation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, amount }),
+      });
+      msgEl.textContent = res.ok ? 'Test donation alert fired.' : 'Failed to fire alert.';
+      msgEl.className = `msg ${res.ok ? 'ok' : 'err'}`;
+    });
+
+    document.getElementById('test-milestone-btn').addEventListener('click', async () => {
+      const amount = Number(document.getElementById('test-milestone-amount').value);
+      const label = document.getElementById('test-milestone-label').value || 'Test milestone';
+      const msgEl = document.getElementById('test-milestone-msg');
+      if (!Number.isFinite(amount) || amount <= 0) {
+        msgEl.textContent = 'Enter a positive amount.';
+        msgEl.className = 'msg err';
+        return;
+      }
+      const res = await apiFetch('/admin/test/milestone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, label }),
+      });
+      msgEl.textContent = res.ok ? 'Test milestone alert fired.' : 'Failed to fire alert.';
+      msgEl.className = `msg ${res.ok ? 'ok' : 'err'}`;
+    });
+
+    // -- Milestone editor --
+    function renderMilestoneRows(milestones) {
+      const container = document.getElementById('milestone-rows');
+      container.innerHTML = '';
+      milestones.forEach((m) => addMilestoneRow(m.amount, m.label));
+    }
+
+    function addMilestoneRow(amount, label) {
+      const container = document.getElementById('milestone-rows');
+      const row = document.createElement('div');
+      row.className = 'milestone-row';
+
+      const amountInput = document.createElement('input');
+      amountInput.type = 'number';
+      amountInput.placeholder = 'Amount ($)';
+      amountInput.value = amount != null ? amount : '';
+
+      const labelInput = document.createElement('input');
+      labelInput.type = 'text';
+      labelInput.placeholder = 'Reward label';
+      labelInput.value = label != null ? label : '';
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'secondary';
+      removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => row.remove());
+
+      row.append(amountInput, labelInput, removeBtn);
+      container.appendChild(row);
+    }
+
+    document.getElementById('add-milestone-btn').addEventListener('click', () => {
+      addMilestoneRow('', '');
+    });
+
+    async function loadMilestones() {
+      try {
+        const res = await apiFetch('/admin/milestones');
+        if (!res.ok) return;
+        const data = await res.json();
+        renderMilestoneRows(data.milestones);
+      } catch {}
+    }
+
+    document.getElementById('save-milestones-btn').addEventListener('click', async () => {
+      const rows = document.querySelectorAll('#milestone-rows .milestone-row');
+      const milestones = [];
+      for (const row of rows) {
+        const inputs = row.querySelectorAll('input');
+        const amount = Number(inputs[0].value);
+        const label = inputs[1].value.trim();
+        if (Number.isFinite(amount) && amount > 0 && label) {
+          milestones.push({ amount, label });
+        }
+      }
+      const msgEl = document.getElementById('milestones-msg');
+      const res = await apiFetch('/admin/milestones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ milestones }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        renderMilestoneRows(data.milestones);
+        msgEl.textContent = 'Milestones saved.';
+        msgEl.className = 'msg ok';
+      } else {
+        msgEl.textContent = 'Failed to save milestones.';
+        msgEl.className = 'msg err';
+      }
+    });
+
+    // -- Sound upload --
+    async function loadTiers() {
+      const container = document.getElementById('tier-rows');
+      container.innerHTML = 'Loading…';
+      try {
+        const res = await fetch('donation-tiers.json');
+        const tiers = await res.json();
+        container.innerHTML = '';
+        tiers.forEach((tier) => addTierRow(tier));
+      } catch (err) {
+        container.textContent = `Could not load donation-tiers.json (${err.message})`;
+      }
+    }
+
+    function addTierRow(tier) {
+      const container = document.getElementById('tier-rows');
+      const row = document.createElement('div');
+      row.className = 'tier-row';
+
+      const label = document.createElement('div');
+      label.className = 'tier-label';
+      label.textContent = tier.label || tier.id;
+
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'audio/*';
+
+      const uploadBtn = document.createElement('button');
+      uploadBtn.className = 'secondary';
+      uploadBtn.textContent = 'Upload';
+
+      const fileName = document.createElement('span');
+      fileName.className = 'tier-file-name';
+      fileName.textContent = tier.sound || '';
+
+      uploadBtn.addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        const msgEl = document.getElementById('sound-msg');
+        if (!file) {
+          msgEl.textContent = 'Choose a file first.';
+          msgEl.className = 'msg err';
+          return;
+        }
+        const formData = new FormData();
+        formData.append('tier', tier.id);
+        formData.append('file', file);
+        try {
+          const res = await apiFetch('/admin/upload-sound', { method: 'POST', body: formData });
+          const data = await res.json();
+          if (res.ok) {
+            msgEl.textContent = `Uploaded sound for ${tier.label || tier.id}.`;
+            msgEl.className = 'msg ok';
+          } else {
+            msgEl.textContent = data.error || 'Upload failed.';
+            msgEl.className = 'msg err';
+          }
+        } catch (err) {
+          msgEl.textContent = `Upload failed: ${err.message}`;
+          msgEl.className = 'msg err';
+        }
+      });
+
+      row.append(label, fileInput, uploadBtn, fileName);
+      container.appendChild(row);
+    }
+
+    // -- Asset image upload (QR code / logos) --
+    async function loadAssetImages() {
+      const container = document.getElementById('asset-image-rows');
+      container.innerHTML = 'Loading…';
+      try {
+        const res = await fetch('asset-images.json');
+        const assets = await res.json();
+        container.innerHTML = '';
+        assets.forEach((asset) => addAssetImageRow(asset));
+      } catch (err) {
+        container.textContent = `Could not load asset-images.json (${err.message})`;
+      }
+    }
+
+    function addAssetImageRow(asset) {
+      const container = document.getElementById('asset-image-rows');
+      const row = document.createElement('div');
+      row.className = 'tier-row';
+
+      const label = document.createElement('div');
+      label.className = 'tier-label';
+      label.textContent = asset.label || asset.id;
+
+      const preview = document.createElement('img');
+      preview.style.cssText = 'width:40px;height:40px;object-fit:contain;background:rgba(255,255,255,0.05);border-radius:4px;flex:0 0 auto;';
+      if (asset.file) preview.src = asset.file;
+
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml';
+
+      const uploadBtn = document.createElement('button');
+      uploadBtn.className = 'secondary';
+      uploadBtn.textContent = 'Upload';
+
+      const fileName = document.createElement('span');
+      fileName.className = 'tier-file-name';
+      fileName.textContent = asset.file || 'No image uploaded';
+
+      uploadBtn.addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        const msgEl = document.getElementById('asset-image-msg');
+        if (!file) {
+          msgEl.textContent = 'Choose a file first.';
+          msgEl.className = 'msg err';
+          return;
+        }
+        const formData = new FormData();
+        formData.append('asset', asset.id);
+        formData.append('file', file);
+        try {
+          const res = await apiFetch('/admin/upload-image', { method: 'POST', body: formData });
+          const data = await res.json();
+          if (res.ok) {
+            preview.src = data.path;
+            fileName.textContent = data.path;
+            msgEl.textContent = `Uploaded image for ${asset.label || asset.id}.`;
+            msgEl.className = 'msg ok';
+          } else {
+            msgEl.textContent = data.error || 'Upload failed.';
+            msgEl.className = 'msg err';
+          }
+        } catch (err) {
+          msgEl.textContent = `Upload failed: ${err.message}`;
+          msgEl.className = 'msg err';
+        }
+      });
+
+      row.append(label, preview, fileInput, uploadBtn, fileName);
+      container.appendChild(row);
+    }
+
+    // -- Boot --
+    if (token) {
+      apiFetch('/admin/state')
+        .then((res) => {
+          if (res.ok) showDashboard();
+          else showLogin('');
+        })
+        .catch(() => showLogin(''));
+    } else {
+      showLogin('');
+    }
+  </script>
+</body>
+</html>

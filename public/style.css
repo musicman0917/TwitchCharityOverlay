@@ -1,0 +1,604 @@
+/* ==========================================================================
+   Tavern Subathon Overlay — cozy fantasy tavern theme (+ Disney alt theme,
+   shared with the NOM Alerts overlay system)
+   Designed for a 1920x1080 OBS Browser Source (transparent background).
+   ========================================================================== */
+
+:root {
+  /* Tavern (default) theme */
+  --card-bg-1: #f1e3c6;
+  --card-bg-2: #e2cfa4;
+  --card-border: #d4a94e;
+
+  --frame-bg-1: #4a3222;
+  --frame-bg-2: #241811;
+  --frame-tint: rgba(44, 30, 22, 0.4);
+  --deep-border: #1a110b;
+  --track-border: #2c1e16;
+
+  --heading-color: #2c1e16;
+  --body-color: #3b2a1c;
+  --label-color: #3b2a1c;
+  --accent-strong: #8a5a1e;
+  --base-text: #f1e3c6;
+  --muted-text: #e2cfa4;
+
+  --gold: #d4a94e;
+  --gold-bright: #f2c766;
+
+  --shadow: rgba(0, 0, 0, 0.65);
+  --glow-scroll: rgba(120, 80, 30, 0.25);
+  --glow-inner: rgba(120, 80, 30, 0.3);
+  --glow-bar: rgba(242, 199, 102, 0.7);
+
+  --font-heading: 'MedievalSharp', cursive;
+  --font-title: 'Cinzel', serif;
+  --font-body: 'Lora', serif;
+}
+
+/* Disney theme — matches NOM Alerts' body[data-theme="disney"] palette */
+:root[data-theme='disney'] {
+  --card-bg-1: #1a0a2e;
+  --card-bg-2: #0d0620;
+  --card-border: #7b2fbe;
+
+  --frame-bg-1: #9b59b6;
+  --frame-bg-2: #0d0620;
+  --frame-tint: rgba(13, 6, 32, 0.5);
+  --deep-border: #0d0620;
+  --track-border: #0d0620;
+
+  --heading-color: #fff8dc;
+  --body-color: #fff8dc;
+  --label-color: #d4aaff;
+  --accent-strong: #ffd700;
+  --base-text: #fff8dc;
+  --muted-text: #d4aaff;
+
+  --gold: #ffd700;
+  --gold-bright: #ffd700;
+
+  --shadow: rgba(0, 0, 0, 0.65);
+  --glow-scroll: rgba(155, 89, 182, 0.35);
+  --glow-inner: rgba(155, 89, 182, 0.35);
+  --glow-bar: rgba(155, 89, 182, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 1920px;
+  height: 1080px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--font-body);
+  color: var(--base-text);
+}
+
+/* --------------------------------------------------------------------------
+   Vignette — dark fantasy atmosphere around the frame edges
+   -------------------------------------------------------------------------- */
+.vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0) 45%,
+    rgba(20, 12, 6, 0.35) 75%,
+    rgba(10, 6, 3, 0.85) 100%
+  );
+}
+
+/* --------------------------------------------------------------------------
+   Asset placeholders — top right corner
+   -------------------------------------------------------------------------- */
+.asset-corner {
+  position: fixed;
+  top: 32px;
+  right: 32px;
+  z-index: 4;
+  display: flex;
+  gap: 16px;
+}
+
+.asset-box {
+  width: 130px;
+  height: 130px;
+  border: 3px dashed var(--card-border);
+  border-radius: 8px;
+  background: var(--frame-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px;
+  transition: border-color 0.4s ease, background-color 0.4s ease;
+}
+
+.asset-box span {
+  font-family: var(--font-title);
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  color: var(--muted-text);
+  text-shadow: 0 2px 4px var(--shadow);
+  transition: color 0.4s ease;
+}
+
+.asset-image {
+  display: none;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Once an image is uploaded for a box, show it and drop the dashed
+   placeholder look/label in favor of a plain solid frame. */
+.asset-box.has-image {
+  border-style: solid;
+  background: transparent;
+}
+
+.asset-box.has-image .asset-image {
+  display: block;
+}
+
+.asset-box.has-image span {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   Alert box — "A New Hero Approaches!" popup, top-center
+   -------------------------------------------------------------------------- */
+.alert-box {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translate(-50%, -140%) scale(0.92);
+  z-index: 10;
+  width: 760px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.alert-box.show {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.alert-scroll {
+  background:
+    radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.08), transparent 60%),
+    linear-gradient(160deg, var(--card-bg-1) 0%, var(--card-bg-2) 100%);
+  border: 4px solid var(--card-border);
+  border-radius: 10px;
+  padding: 28px 40px;
+  text-align: center;
+  box-shadow: 0 12px 32px var(--shadow), inset 0 0 30px var(--glow-scroll);
+  position: relative;
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.alert-scroll::before,
+.alert-scroll::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 22px;
+  background: linear-gradient(180deg, var(--frame-bg-1), var(--frame-bg-2));
+  border: 2px solid var(--deep-border);
+  border-radius: 6px;
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.alert-scroll::before { left: -18px; }
+.alert-scroll::after { right: -18px; }
+
+.alert-heading {
+  margin: 0 0 8px;
+  font-family: var(--font-heading);
+  font-size: 34px;
+  color: var(--heading-color);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: color 0.4s ease;
+}
+
+.alert-body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--body-color);
+  transition: color 0.4s ease;
+}
+
+.alert-body span {
+  color: var(--accent-strong);
+  font-weight: 700;
+  transition: color 0.4s ease;
+}
+
+/* Tier escalation — bigger + more glow for larger donations
+   (tier1 is the base .alert-box/.alert-scroll styling above) */
+.alert-box.tier2 {
+  width: 820px;
+}
+
+.alert-box.tier2 .alert-scroll {
+  border-width: 5px;
+  box-shadow: 0 14px 40px var(--shadow), inset 0 0 34px var(--glow-scroll), 0 0 40px var(--glow-bar);
+}
+
+.alert-box.tier2 .alert-heading {
+  font-size: 36px;
+}
+
+.alert-box.tier2 .alert-body {
+  font-size: 27px;
+}
+
+.alert-box.tier3 {
+  width: 900px;
+}
+
+.alert-box.tier3 .alert-scroll {
+  border-width: 6px;
+  border-color: var(--gold);
+  box-shadow: 0 16px 48px var(--shadow), inset 0 0 40px var(--glow-scroll), 0 0 60px var(--glow-bar);
+  animation: donationTierPulse 1.4s ease-in-out infinite;
+}
+
+.alert-box.tier3 .alert-heading {
+  font-size: 40px;
+}
+
+.alert-box.tier3 .alert-body {
+  font-size: 30px;
+}
+
+@keyframes donationTierPulse {
+  0%, 100% { box-shadow: 0 16px 48px var(--shadow), inset 0 0 40px var(--glow-scroll), 0 0 60px var(--glow-bar); }
+  50%      { box-shadow: 0 16px 48px var(--shadow), inset 0 0 40px var(--glow-scroll), 0 0 100px var(--glow-bar); }
+}
+
+/* --------------------------------------------------------------------------
+   Quest board — bottom UI bar, split into three separate panels (not one
+   continuous bar) so a vertical clip crop (e.g. StreamLadder) always lands
+   cleanly on a complete panel or the gap between them, instead of slicing
+   through the middle of a single connected slab.
+   -------------------------------------------------------------------------- */
+.quest-board {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 24px;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 32px;
+}
+
+.quest-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 14px 28px;
+  background:
+    radial-gradient(ellipse at top, rgba(255, 255, 255, 0.06), transparent 60%),
+    linear-gradient(180deg, var(--card-bg-1) 0%, var(--card-bg-2) 100%);
+  border: 3px solid var(--card-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px var(--shadow), inset 0 0 22px var(--glow-inner);
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, padding 0.5s ease;
+}
+
+.quest-label {
+  font-family: var(--font-title);
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--label-color);
+  margin-bottom: 6px;
+  transition: color 0.4s ease;
+}
+
+/* Timer */
+.timer-section {
+  flex: 0 0 auto;
+  min-width: 220px;
+}
+
+.timer {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 52px;
+  color: var(--heading-color);
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: color 0.4s ease, opacity 0.3s ease, font-size 0.5s ease;
+}
+
+.timer.paused {
+  opacity: 0.6;
+  animation: timerPausedPulse 1.6s ease-in-out infinite;
+}
+
+.timer.paused::after {
+  content: '⏸ PAUSED';
+  display: block;
+  font-family: var(--font-title);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent-strong);
+  margin-top: 2px;
+}
+
+@keyframes timerPausedPulse {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 0.85; }
+}
+
+/* Goal tracker */
+.goal-section {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 1100px;
+}
+
+#goal-text {
+  font-size: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goal-bar-wrap {
+  position: relative;
+}
+
+.goal-bar-track {
+  width: 100%;
+  height: 26px;
+  background: var(--frame-tint);
+  border: 2px solid var(--track-border);
+  border-radius: 13px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.4s ease, background-color 0.4s ease, height 0.5s ease;
+}
+
+.goal-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--gold), var(--gold), var(--gold-bright));
+  box-shadow: 0 0 12px var(--glow-bar);
+  transition: width 0.8s ease-out, background 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* Milestone markers overlaid on the goal bar */
+.goal-bar-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.goal-bar-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+}
+
+.goal-bar-marker-tick {
+  display: block;
+  width: 3px;
+  height: 100%;
+  background: var(--track-border);
+  opacity: 0.6;
+  transition: background-color 0.4s ease, opacity 0.3s ease, box-shadow 0.3s ease;
+}
+
+.goal-bar-marker.reached .goal-bar-marker-tick {
+  background: var(--gold);
+  opacity: 1;
+  box-shadow: 0 0 8px var(--glow-bar);
+}
+
+/* Latest hero */
+.hero-section {
+  flex: 0 0 auto;
+  min-width: 320px;
+  max-width: 420px;
+}
+
+.latest-hero {
+  font-family: var(--font-body);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--body-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.4s ease;
+}
+
+/* --------------------------------------------------------------------------
+   Minimized quest board — while the timer is paused (e.g. the lead-up
+   period before a stream), the panels shrink down to just the essentials
+   (timer + goal) instead of taking up their full on-stream footprint.
+   -------------------------------------------------------------------------- */
+.quest-board.minimized .quest-panel {
+  padding: 8px 20px;
+}
+
+.quest-board.minimized .hero-section,
+.quest-board.minimized .goal-bar-markers {
+  display: none;
+}
+
+.quest-board.minimized .timer-section {
+  min-width: 0;
+}
+
+.quest-board.minimized .quest-label {
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.quest-board.minimized .timer {
+  font-size: 26px;
+}
+
+.quest-board.minimized .timer.paused::after {
+  display: none;
+}
+
+.quest-board.minimized #goal-text {
+  font-size: 14px;
+}
+
+.quest-board.minimized .goal-bar-track {
+  height: 14px;
+  border-radius: 7px;
+}
+
+/* --------------------------------------------------------------------------
+   Next milestone callout — pops in near the goal bar every so often
+   -------------------------------------------------------------------------- */
+.next-milestone {
+  position: fixed;
+  bottom: 172px;
+  left: 50%;
+  transform: translate(-50%, 12px);
+  z-index: 6;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 24px;
+  background:
+    radial-gradient(ellipse at top, rgba(255, 255, 255, 0.08), transparent 60%),
+    linear-gradient(160deg, var(--card-bg-1) 0%, var(--card-bg-2) 100%);
+  border: 3px solid var(--card-border);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px var(--shadow), inset 0 0 16px var(--glow-inner);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.4s ease, border-color 0.4s ease;
+}
+
+.next-milestone.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.next-milestone-label {
+  font-family: var(--font-title);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--label-color);
+  transition: color 0.4s ease;
+}
+
+.next-milestone-amount {
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold);
+  transition: color 0.4s ease;
+}
+
+.next-milestone-text {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--body-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+  transition: color 0.4s ease;
+}
+
+/* --------------------------------------------------------------------------
+   Milestone alert — big full-screen popup when a milestone is crossed
+   -------------------------------------------------------------------------- */
+.milestone-alert {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+.milestone-alert.show {
+  opacity: 1;
+}
+
+.milestone-alert-inner {
+  width: 900px;
+  padding: 48px 60px;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.1), transparent 60%),
+    linear-gradient(160deg, var(--card-bg-1) 0%, var(--card-bg-2) 100%);
+  border: 6px solid var(--gold);
+  border-radius: 16px;
+  box-shadow: 0 0 80px var(--glow-bar), 0 24px 64px var(--shadow), inset 0 0 40px var(--glow-scroll);
+  transform: scale(0.85);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.milestone-alert.show .milestone-alert-inner {
+  transform: scale(1);
+  animation: milestonePulse 1.6s ease-in-out infinite;
+}
+
+@keyframes milestonePulse {
+  0%, 100% { box-shadow: 0 0 80px var(--glow-bar), 0 24px 64px var(--shadow), inset 0 0 40px var(--glow-scroll); }
+  50%      { box-shadow: 0 0 140px var(--glow-bar), 0 24px 64px var(--shadow), inset 0 0 40px var(--glow-scroll); }
+}
+
+.milestone-alert-heading {
+  margin: 0 0 12px;
+  font-family: var(--font-heading);
+  font-size: 40px;
+  color: var(--heading-color);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: color 0.4s ease;
+}
+
+.milestone-alert-amount {
+  margin: 0 0 12px;
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 84px;
+  color: var(--gold);
+  text-shadow: 0 0 30px var(--glow-bar);
+  transition: color 0.4s ease;
+}
+
+.milestone-alert-label {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 28px;
+  font-style: italic;
+  color: var(--body-color);
+  transition: color 0.4s ease;
+}

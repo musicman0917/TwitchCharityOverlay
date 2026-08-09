@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Tavern Donothon Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="vignette"></div>
+
+  <!-- Asset boxes: top right. Dashed border + label show until an image is
+       uploaded through the admin portal, then the image fills the box. -->
+  <div class="asset-corner">
+    <div class="asset-box" id="qr-code-box">
+      <img class="asset-image" id="qr-code-image" alt="QR Code" />
+      <span>QR Code</span>
+    </div>
+    <div class="asset-box" id="extra-life-logo-box">
+      <img class="asset-image" id="extra-life-logo-image" alt="Extra Life Logo" />
+      <span>Extra Life Logo</span>
+    </div>
+    <div class="asset-box" id="dayton-childrens-logo-box">
+      <img class="asset-image" id="dayton-childrens-logo-image" alt="Dayton Children's Logo" />
+      <span>Dayton Children's Logo</span>
+    </div>
+  </div>
+
+  <!-- New donation alert -->
+  <div class="alert-box" id="alert-box">
+    <div class="alert-scroll">
+      <p class="alert-heading">A New Hero Approaches!</p>
+      <p class="alert-body">
+        <span id="alert-name">Someone</span> donated
+        <span id="alert-amount">$0</span>!
+      </p>
+    </div>
+  </div>
+
+  <!-- Next milestone callout: pops in near the goal bar every so often -->
+  <div class="next-milestone" id="next-milestone">
+    <span class="next-milestone-label">Next Milestone</span>
+    <span class="next-milestone-amount" id="next-milestone-amount">$0</span>
+    <span class="next-milestone-text" id="next-milestone-text"></span>
+  </div>
+
+  <!-- Full-screen milestone alert (bigger/flashier than the donation alert) -->
+  <div class="milestone-alert" id="milestone-alert">
+    <div class="milestone-alert-inner">
+      <p class="milestone-alert-heading">Milestone Reached!</p>
+      <p class="milestone-alert-amount" id="milestone-alert-amount">$0</p>
+      <p class="milestone-alert-label" id="milestone-alert-label"></p>
+    </div>
+  </div>
+
+  <!-- Bottom UI bar: The Quest Board — three separate panels (not one
+       continuous bar) so a vertical clip crop (e.g. StreamLadder) always
+       lands cleanly on a complete panel or the gap between them, instead
+       of slicing through the middle of a single connected slab. -->
+  <div class="quest-board" id="quest-board">
+
+    <div class="quest-panel timer-section">
+      <span class="quest-label">Donothon Timer</span>
+      <span class="timer" id="timer">04:00:00</span>
+    </div>
+
+    <div class="quest-panel goal-section">
+      <span class="quest-label" id="goal-text">$0 / $1000 &mdash; For Dayton Children's Hospital</span>
+      <div class="goal-bar-wrap">
+        <div class="goal-bar-track">
+          <div class="goal-bar-fill" id="goal-bar-fill"></div>
+        </div>
+        <div class="goal-bar-markers" id="goal-bar-markers"></div>
+      </div>
+    </div>
+
+    <div class="quest-panel hero-section">
+      <span class="quest-label">Latest Hero</span>
+      <span class="latest-hero" id="latest-hero">Awaiting a brave soul&hellip;</span>
+    </div>
+
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
