@@ -69,6 +69,26 @@ const SOUNDS_DIR = path.join(__dirname, 'public', 'Assets', 'Sounds');
 const ASSET_IMAGES_FILE = path.join(__dirname, 'public', 'asset-images.json');
 const IMAGES_DIR = path.join(__dirname, 'public', 'Assets', 'Images');
 
+// milestones.json / donation-tiers.json / asset-images.json are gitignored
+// once they exist -- the admin portal mutates them live, and tracking them
+// in git would mean every future code update risks a merge conflict with
+// (or silently overwriting) real data set on the server. Seed each from
+// its committed *.example.json the first time it's missing; after that,
+// it's purely local state.
+function seedFromExample(targetFile, exampleFile) {
+  if (fs.existsSync(targetFile)) return;
+  try {
+    fs.copyFileSync(exampleFile, targetFile);
+    console.log(`[bootstrap] created ${path.basename(targetFile)} from ${path.basename(exampleFile)}`);
+  } catch (err) {
+    console.warn(`[bootstrap] could not seed ${path.basename(targetFile)}: ${err.message}`);
+  }
+}
+
+seedFromExample(MILESTONES_FILE, path.join(__dirname, 'milestones.example.json'));
+seedFromExample(DONATION_TIERS_FILE, path.join(__dirname, 'public', 'donation-tiers.example.json'));
+seedFromExample(ASSET_IMAGES_FILE, path.join(__dirname, 'public', 'asset-images.example.json'));
+
 function loadMilestones() {
   try {
     const raw = fs.readFileSync(MILESTONES_FILE, 'utf8');
@@ -145,6 +165,14 @@ function loadDonationTiers() {
 function saveDonationTiers(list) {
   fs.writeFileSync(DONATION_TIERS_FILE, JSON.stringify(list, null, 2) + '\n');
 }
+
+// Self-heal on every boot: loadDonationTiers() normalizes any legacy sound
+// formats (bare strings, or the pre-multi-sound singular `sound` field) in
+// memory, and this writes that normalized shape straight back to disk --
+// so the raw static file (what the overlay and admin portal both fetch
+// directly) is never stuck serving an old format while waiting for the
+// next admin upload/remove action to trigger normalization.
+saveDonationTiers(loadDonationTiers());
 
 // asset-images.json lives in public/ (like donation-tiers.json) because the
 // unauthenticated overlay itself needs to fetch it client-side to know

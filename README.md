@@ -19,6 +19,36 @@ cp .env.example .env   # then edit .env and set a real ADMIN_PASSWORD
 `.env` is gitignored — this repo is public, so never commit real secrets. `deploy.ps1`
 creates `.env` from `.env.example` automatically on first install if it's missing.
 
+## Local data files (milestones / donation sounds / asset images)
+
+`milestones.json`, `public/donation-tiers.json`, and `public/asset-images.json` are **not**
+tracked in git — they're real data the admin portal mutates live on your server (milestones
+you've set, sounds you've uploaded, logos you've uploaded), and tracking them would mean any
+future code update could conflict with or overwrite what's actually running.
+
+Each is seeded automatically from its committed `*.example.json` template
+(`milestones.example.json`, `public/donation-tiers.example.json`,
+`public/asset-images.example.json`) the first time `server.js` boots and finds it missing —
+after that, it's purely local. To change the *shipped defaults* for a fresh install, edit the
+`.example.json` file, not the live one.
+
+**If a `git pull` ever fails with "local changes would be overwritten" on one of these three
+files** (shouldn't happen anymore now that they're gitignored, but if you're recovering from
+before this change): back up the live file, let git have its way, restore your backup —
+nothing is lost:
+
+```powershell
+Copy-Item public\donation-tiers.json public\donation-tiers.backup.json
+git checkout -- public\donation-tiers.json
+git pull origin claude/twitch-charity-subathon-overlay-qtwc8a
+Copy-Item public\donation-tiers.backup.json public\donation-tiers.json -Force
+pm2 restart nom-charity-overlay
+```
+
+(Swap in `milestones.json` or `public\asset-images.json` if the conflict is on one of those
+instead.) The server normalizes the sound file format on every boot regardless of which
+schema version your restored file is in, so nothing needs to match exactly.
+
 ## Configuration
 
 The server reads optional environment variables (all have sensible defaults except

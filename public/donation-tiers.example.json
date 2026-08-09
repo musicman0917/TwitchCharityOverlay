@@ -1,0 +1,5 @@
+[
+  { "id": "tier1", "label": "Small Donation", "minAmount": 1, "durationMs": 5000, "sounds": [] },
+  { "id": "tier2", "label": "Medium Donation", "minAmount": 25, "durationMs": 6500, "sounds": [] },
+  { "id": "tier3", "label": "Large Donation", "minAmount": 100, "durationMs": 8000, "sounds": [] }
+]

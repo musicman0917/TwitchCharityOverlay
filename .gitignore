@@ -4,3 +4,12 @@ npm-debug.log
 .env
 .env.local
 .overlay-state.json
+
+# These are seeded from their .example.json on first boot (see server.js),
+# then mutated live by the admin portal -- never git-tracked past that
+# point, so a future `git pull` can never conflict with or overwrite
+# real data (milestones, uploaded sounds, uploaded images) you've set on
+# the server. Edit *.example.json instead to change the shipped defaults.
+milestones.json
+public/donation-tiers.json
+public/asset-images.json

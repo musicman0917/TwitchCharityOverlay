@@ -806,13 +806,17 @@
       }
 
       sounds.forEach((sound) => {
-        const soundPath = sound.path;
+        // Tolerate a bare string too, in case the raw file hasn't been
+        // normalized to {path, name} yet (server.js normalizes on every
+        // boot, but this is cheap insurance either way).
+        const soundPath = typeof sound === 'string' ? sound : sound.path;
+        const soundName = typeof sound === 'string' ? null : sound.name;
         const item = document.createElement('div');
         item.className = 'tier-sound-item';
 
         const name = document.createElement('span');
         name.className = 'tier-sound-name';
-        name.textContent = sound.name || soundPath;
+        name.textContent = soundName || soundPath;
         name.title = soundPath;
 
         const playBtn = document.createElement('button');
@@ -836,7 +840,7 @@
             const data = await res.json();
             tier.sounds = data.sounds;
             renderTierBlocks();
-            msgEl.textContent = `Removed "${sound.name || soundPath}" from ${tier.label || tier.id}.`;
+            msgEl.textContent = `Removed "${soundName || soundPath}" from ${tier.label || tier.id}.`;
             msgEl.className = 'msg ok';
           } else {
             msgEl.textContent = 'Failed to remove sound.';
