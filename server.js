@@ -261,6 +261,9 @@ const state = {
   // any later restart, including ones that happen mid-stream.
   timerPaused: persisted.timerPaused ?? true,
   scheduledStartAt: persisted.scheduledStartAt ?? null, // ISO string or null
+  // When on, every donation adds double the usual time to the timer -- for
+  // bonus-time streams/days (toggled manually via the admin portal).
+  doubleTimeActive: persisted.doubleTimeActive ?? false,
 };
 
 function saveState() {
@@ -276,6 +279,7 @@ function saveState() {
     milestonesChecked: state.milestonesChecked,
     timerPaused: state.timerPaused,
     scheduledStartAt: state.scheduledStartAt,
+    doubleTimeActive: state.doubleTimeActive,
   };
   fs.writeFileSync(STATE_FILE, JSON.stringify(snapshot, null, 2));
 }
@@ -320,6 +324,7 @@ function serializeState() {
     milestones: serializeMilestones(),
     timerPaused: state.timerPaused,
     scheduledStartAt: state.scheduledStartAt,
+    doubleTimeActive: state.doubleTimeActive,
   };
 }
 
@@ -455,13 +460,14 @@ async function pollDonations() {
         ? donation.displayName.trim()
         : 'Anonymous';
 
-      const secondsToAdd = Math.floor(amount) * SECONDS_PER_DOLLAR;
+      const timeMultiplier = state.doubleTimeActive ? 2 : 1;
+      const secondsToAdd = Math.floor(amount) * SECONDS_PER_DOLLAR * timeMultiplier;
       state.currentTimer += secondsToAdd;
 
       state.latestDonorName = name;
       state.latestDonorAmount = amount;
 
-      console.log(`[donation] ${name} donated $${amount.toFixed(2)} (+${secondsToAdd}s)`);
+      console.log(`[donation] ${name} donated $${amount.toFixed(2)} (+${secondsToAdd}s${timeMultiplier > 1 ? `, ${timeMultiplier}x double time` : ''})`);
 
       io.emit('newDonation', { name, amount });
       io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
@@ -690,6 +696,16 @@ app.post('/admin/timer/schedule/clear', requireAdminAuth, (req, res) => {
   io.emit('scheduleUpdate', { scheduledStartAt: null });
   saveState();
   res.json({ ok: true });
+});
+
+// Doubles the per-dollar time bonus (see SECONDS_PER_DOLLAR) for bonus-time
+// streams/days -- e.g. $1 becomes +2 minutes instead of +1 while active.
+app.post('/admin/timer/double-time', requireAdminAuth, (req, res) => {
+  state.doubleTimeActive = !!(req.body && req.body.enabled);
+  console.log(`[timer] double time ${state.doubleTimeActive ? 'enabled' : 'disabled'}`);
+  io.emit('doubleTimeUpdate', { doubleTimeActive: state.doubleTimeActive });
+  saveState();
+  res.json({ ok: true, doubleTimeActive: state.doubleTimeActive });
 });
 
 // -- Test alerts — visual/audio preview only, never touches real state --
