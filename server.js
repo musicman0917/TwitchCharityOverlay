@@ -48,6 +48,7 @@ if (!ADMIN_PASSWORD) {
 const PARTICIPANT_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}`;
 const DONATIONS_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}/donations`;
 const INCENTIVES_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}/incentives`;
+const MILESTONES_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}/milestones`;
 
 const donorDriveClient = axios.create({
   timeout: 10000,
@@ -60,22 +61,21 @@ const nomAlertsClient = axios.create({
 });
 
 // ---------------------------------------------------------------------------
-// Donation milestones — placeholder amounts/labels, edit milestones.json to
-// set the real ones. Sorted ascending so goal-bar markers and the milestone
-// track render in order.
+// Donation milestones — pulled from the Extra Life participant's own
+// Fundraiser Milestones (DonorDrive), not locally edited. See pollMilestones
+// below for the fetch/mapping.
 // ---------------------------------------------------------------------------
-const MILESTONES_FILE = path.join(__dirname, 'milestones.json');
 const DONATION_TIERS_FILE = path.join(__dirname, 'public', 'donation-tiers.json');
 const SOUNDS_DIR = path.join(__dirname, 'public', 'Assets', 'Sounds');
 const ASSET_IMAGES_FILE = path.join(__dirname, 'public', 'asset-images.json');
 const IMAGES_DIR = path.join(__dirname, 'public', 'Assets', 'Images');
 
-// milestones.json / donation-tiers.json / asset-images.json are gitignored
-// once they exist -- the admin portal mutates them live, and tracking them
-// in git would mean every future code update risks a merge conflict with
-// (or silently overwriting) real data set on the server. Seed each from
-// its committed *.example.json the first time it's missing; after that,
-// it's purely local state.
+// donation-tiers.json / asset-images.json are gitignored once they exist --
+// the admin portal mutates them live, and tracking them in git would mean
+// every future code update risks a merge conflict with (or silently
+// overwriting) real data set on the server. Seed each from its committed
+// *.example.json the first time it's missing; after that, it's purely
+// local state.
 function seedFromExample(targetFile, exampleFile) {
   if (fs.existsSync(targetFile)) return;
   try {
@@ -86,48 +86,8 @@ function seedFromExample(targetFile, exampleFile) {
   }
 }
 
-seedFromExample(MILESTONES_FILE, path.join(__dirname, 'milestones.example.json'));
 seedFromExample(DONATION_TIERS_FILE, path.join(__dirname, 'public', 'donation-tiers.example.json'));
 seedFromExample(ASSET_IMAGES_FILE, path.join(__dirname, 'public', 'asset-images.example.json'));
-
-function loadMilestones() {
-  try {
-    const raw = fs.readFileSync(MILESTONES_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error('milestones.json must be a JSON array');
-    return parsed
-      .filter((m) => typeof m.amount === 'number' && typeof m.label === 'string')
-      .sort((a, b) => a.amount - b.amount);
-  } catch (err) {
-    console.warn(`[milestones] could not load milestones.json (${err.message}); no milestones configured`);
-    return [];
-  }
-}
-
-let milestones = loadMilestones();
-
-// Overwrites milestones.json, reloads the in-memory list, and recomputes
-// which ones count as "reached" against the current total — silently, like
-// the startup baseline, since an admin edit isn't a real donation crossing
-// and shouldn't fire alerts.
-function saveMilestones(newMilestones) {
-  const cleaned = newMilestones
-    .filter((m) => typeof m.amount === 'number' && m.amount > 0 && typeof m.label === 'string' && m.label.trim())
-    .map((m) => ({ amount: m.amount, label: m.label.trim() }))
-    .sort((a, b) => a.amount - b.amount);
-
-  fs.writeFileSync(MILESTONES_FILE, JSON.stringify(cleaned, null, 2) + '\n');
-  milestones = cleaned;
-
-  state.reachedMilestones = new Set(
-    milestones.filter((m) => state.totalRaised >= m.amount).map((m) => m.amount)
-  );
-
-  console.log(`[milestones] admin updated milestones.json (${milestones.length} milestone(s))`);
-  io.emit('milestonesUpdate', { milestones: serializeMilestones() });
-  saveState();
-  return milestones;
-}
 
 // Each sound is normalized to { path, name } -- `name` is the original
 // uploaded filename (e.g. "cash-register.mp3"), shown in the admin portal
@@ -269,6 +229,11 @@ const state = {
   // Not persisted -- cheap to re-fetch on boot, and always shown fresh from
   // the API rather than a possibly-stale snapshot.
   incentives: [],
+  // Fundraiser Milestones from DonorDrive (amount + description). Persisted
+  // as a last-known-good cache so a transient fetch failure right around
+  // stream time doesn't blank out the goal-bar markers/next-milestone
+  // callout -- overwritten as soon as the next poll succeeds.
+  milestones: Array.isArray(persisted.milestones) ? persisted.milestones : [],
 };
 
 function saveState() {
@@ -285,6 +250,7 @@ function saveState() {
     timerPaused: state.timerPaused,
     scheduledStartAt: state.scheduledStartAt,
     doubleTimeActive: state.doubleTimeActive,
+    milestones: state.milestones,
   };
   fs.writeFileSync(STATE_FILE, JSON.stringify(snapshot, null, 2));
 }
@@ -335,7 +301,7 @@ function serializeState() {
 }
 
 function serializeMilestones() {
-  return milestones.map((m) => ({
+  return state.milestones.map((m) => ({
     amount: m.amount,
     label: m.label,
     reached: state.reachedMilestones.has(m.amount),
@@ -359,7 +325,7 @@ function checkMilestones() {
   state.milestonesChecked = true;
 
   const newlyReached = [];
-  for (const m of milestones) {
+  for (const m of state.milestones) {
     if (state.totalRaised >= m.amount && !state.reachedMilestones.has(m.amount)) {
       state.reachedMilestones.add(m.amount);
       newlyReached.push(m);
@@ -493,11 +459,12 @@ async function pollExtraLife() {
 pollExtraLife();
 setInterval(pollExtraLife, POLL_INTERVAL_MS);
 
-// Fundraiser Incentives ("$50 - I'll do a dare!") change far less often than
-// donations/totals, so they're fetched on their own much slower cadence
-// instead of joining the main POLL_INTERVAL_MS loop -- no need to hammer the
-// API for data that basically never changes mid-stream.
-const INCENTIVES_POLL_INTERVAL_MS = 5 * 60 * 1000;
+// Fundraiser Incentives ("$50 - I'll do a dare!") and Fundraiser Milestones
+// (goal-bar rewards) both change far less often than donations/totals, so
+// they're fetched on their own much slower cadence instead of joining the
+// main POLL_INTERVAL_MS loop -- no need to hammer the API for data that
+// basically never changes mid-stream.
+const DONOR_DRIVE_METADATA_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 async function pollIncentives() {
   try {
@@ -512,7 +479,36 @@ async function pollIncentives() {
 }
 
 pollIncentives();
-setInterval(pollIncentives, INCENTIVES_POLL_INTERVAL_MS);
+setInterval(pollIncentives, DONOR_DRIVE_METADATA_POLL_INTERVAL_MS);
+
+// Maps DonorDrive's Fundraiser Milestone fields onto the {amount, label}
+// shape the rest of the app already works with (goal-bar markers, the
+// "Next Milestone" callout, checkMilestones' reached-tracking), and drops
+// any inactive ones. Recomputes "reached" against the current total
+// silently (like an admin edit used to) so a milestone list change never
+// fires a pile of alerts on its own -- only real donation crossings do.
+function pollMilestones() {
+  return donorDriveClient.get(MILESTONES_URL).then(({ data }) => {
+    if (!Array.isArray(data)) return;
+
+    state.milestones = data
+      .filter((m) => m.isActive !== false && typeof m.fundraisingGoal === 'number' && typeof m.description === 'string')
+      .map((m) => ({ amount: m.fundraisingGoal, label: m.description }))
+      .sort((a, b) => a.amount - b.amount);
+
+    state.reachedMilestones = new Set(
+      state.milestones.filter((m) => state.totalRaised >= m.amount).map((m) => m.amount)
+    );
+
+    io.emit('milestonesUpdate', { milestones: serializeMilestones() });
+    saveState();
+  }).catch((err) => {
+    console.error('[poll] failed to fetch milestones:', err.message);
+  });
+}
+
+pollMilestones();
+setInterval(pollMilestones, DONOR_DRIVE_METADATA_POLL_INTERVAL_MS);
 
 // ---------------------------------------------------------------------------
 // NOM Alerts theme sync — live via SSE from nom-token-broker's /alerts-stream,
@@ -756,20 +752,6 @@ app.post('/admin/test/milestone', requireAdminAuth, (req, res) => {
   }
   io.emit('milestoneReached', { amount, label, test: true });
   res.json({ ok: true });
-});
-
-// -- Milestone editor --
-app.get('/admin/milestones', requireAdminAuth, (req, res) => {
-  res.json({ milestones: serializeMilestones() });
-});
-
-app.post('/admin/milestones', requireAdminAuth, (req, res) => {
-  const incoming = req.body && req.body.milestones;
-  if (!Array.isArray(incoming)) {
-    return res.status(400).json({ error: 'milestones must be an array' });
-  }
-  saveMilestones(incoming);
-  res.json({ ok: true, milestones: serializeMilestones() });
 });
 
 // -- Sound upload for donation tiers -- each tier can have multiple sounds;

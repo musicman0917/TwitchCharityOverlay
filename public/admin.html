@@ -132,16 +132,6 @@
   .pill.running { background: rgba(107, 168, 107, 0.2); color: var(--success); }
   .pill.paused { background: rgba(200, 92, 74, 0.2); color: var(--danger); }
 
-  .milestone-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-
-  .milestone-row input[type="text"] { flex: 1 1 auto; }
-  .milestone-row input[type="number"] { width: 110px; flex: 0 0 auto; }
-
   .tier-row {
     display: flex;
     gap: 12px;
@@ -407,12 +397,11 @@
 
     <div class="panel">
       <h2>Milestones</h2>
-      <div id="milestone-rows"></div>
-      <div class="row">
-        <div style="flex: 0 0 auto;"><button class="secondary" id="add-milestone-btn">+ Add Milestone</button></div>
-        <div style="flex: 0 0 auto;"><button id="save-milestones-btn">Save Milestones</button></div>
-      </div>
-      <div class="msg" id="milestones-msg"></div>
+      <p class="subtitle" style="margin-bottom: 12px;">
+        Read-only — pulled straight from your Extra Life participant page's Fundraiser
+        Milestones (set up there, not here). Refreshes automatically every few minutes.
+      </p>
+      <div id="milestone-rows" class="incentive-list"></div>
     </div>
 
     <div class="panel">
@@ -477,7 +466,6 @@
       document.getElementById('login-screen').classList.add('hidden');
       document.getElementById('dashboard').classList.add('visible');
       refreshStatus();
-      loadMilestones();
       loadTiers();
       loadAssetImages();
     }
@@ -602,6 +590,7 @@
       renderBaseStatus(state.baseSeconds);
       renderDoubleTimeStatus(state.doubleTimeActive);
       renderIncentives(state.incentives);
+      renderMilestoneRows(state.milestones);
       const pill = document.getElementById('status-pill');
       if (state.timerPaused) {
         pill.textContent = 'PAUSED';
@@ -827,77 +816,45 @@
       msgEl.className = `msg ${res.ok ? 'ok' : 'err'}`;
     });
 
-    // -- Milestone editor --
+    // -- Milestones (read-only, pulled from Extra Life's Fundraiser Milestones) --
     function renderMilestoneRows(milestones) {
       const container = document.getElementById('milestone-rows');
       container.innerHTML = '';
-      milestones.forEach((m) => addMilestoneRow(m.amount, m.label));
-    }
+      const list = Array.isArray(milestones) ? milestones : [];
 
-    function addMilestoneRow(amount, label) {
-      const container = document.getElementById('milestone-rows');
-      const row = document.createElement('div');
-      row.className = 'milestone-row';
+      if (list.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'tier-empty';
+        empty.textContent = 'No milestones found on your Extra Life participant page.';
+        container.appendChild(empty);
+        return;
+      }
 
-      const amountInput = document.createElement('input');
-      amountInput.type = 'number';
-      amountInput.placeholder = 'Amount ($)';
-      amountInput.value = amount != null ? amount : '';
+      for (const m of list) {
+        const item = document.createElement('div');
+        item.className = 'incentive-item';
 
-      const labelInput = document.createElement('input');
-      labelInput.type = 'text';
-      labelInput.placeholder = 'Reward label';
-      labelInput.value = label != null ? label : '';
+        const amount = document.createElement('span');
+        amount.className = 'incentive-amount';
+        amount.textContent = formatMoney(m.amount);
 
-      const removeBtn = document.createElement('button');
-      removeBtn.className = 'secondary';
-      removeBtn.textContent = 'Remove';
-      removeBtn.addEventListener('click', () => row.remove());
+        const label = document.createElement('span');
+        label.className = 'incentive-desc';
+        label.textContent = m.label || '';
 
-      row.append(amountInput, labelInput, removeBtn);
-      container.appendChild(row);
-    }
+        item.appendChild(amount);
+        item.appendChild(label);
 
-    document.getElementById('add-milestone-btn').addEventListener('click', () => {
-      addMilestoneRow('', '');
-    });
-
-    async function loadMilestones() {
-      try {
-        const res = await apiFetch('/admin/milestones');
-        if (!res.ok) return;
-        const data = await res.json();
-        renderMilestoneRows(data.milestones);
-      } catch {}
-    }
-
-    document.getElementById('save-milestones-btn').addEventListener('click', async () => {
-      const rows = document.querySelectorAll('#milestone-rows .milestone-row');
-      const milestones = [];
-      for (const row of rows) {
-        const inputs = row.querySelectorAll('input');
-        const amount = Number(inputs[0].value);
-        const label = inputs[1].value.trim();
-        if (Number.isFinite(amount) && amount > 0 && label) {
-          milestones.push({ amount, label });
+        if (m.reached) {
+          const meta = document.createElement('span');
+          meta.className = 'incentive-meta';
+          meta.textContent = 'reached';
+          item.appendChild(meta);
         }
+
+        container.appendChild(item);
       }
-      const msgEl = document.getElementById('milestones-msg');
-      const res = await apiFetch('/admin/milestones', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ milestones }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        renderMilestoneRows(data.milestones);
-        msgEl.textContent = 'Milestones saved.';
-        msgEl.className = 'msg ok';
-      } else {
-        msgEl.textContent = 'Failed to save milestones.';
-        msgEl.className = 'msg err';
-      }
-    });
+    }
 
     // -- Sound upload --
     let currentTiers = [];

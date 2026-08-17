@@ -19,20 +19,22 @@ cp .env.example .env   # then edit .env and set a real ADMIN_PASSWORD
 `.env` is gitignored — this repo is public, so never commit real secrets. `deploy.ps1`
 creates `.env` from `.env.example` automatically on first install if it's missing.
 
-## Local data files (milestones / donation sounds / asset images)
+## Local data files (donation sounds / asset images)
 
-`milestones.json`, `public/donation-tiers.json`, and `public/asset-images.json` are **not**
-tracked in git — they're real data the admin portal mutates live on your server (milestones
-you've set, sounds you've uploaded, logos you've uploaded), and tracking them would mean any
-future code update could conflict with or overwrite what's actually running.
+`public/donation-tiers.json` and `public/asset-images.json` are **not** tracked in git —
+they're real data the admin portal mutates live on your server (sounds you've uploaded, logos
+you've uploaded), and tracking them would mean any future code update could conflict with or
+overwrite what's actually running.
 
 Each is seeded automatically from its committed `*.example.json` template
-(`milestones.example.json`, `public/donation-tiers.example.json`,
-`public/asset-images.example.json`) the first time `server.js` boots and finds it missing —
-after that, it's purely local. To change the *shipped defaults* for a fresh install, edit the
-`.example.json` file, not the live one.
+(`public/donation-tiers.example.json`, `public/asset-images.example.json`) the first time
+`server.js` boots and finds it missing — after that, it's purely local. To change the *shipped
+defaults* for a fresh install, edit the `.example.json` file, not the live one.
 
-**If a `git pull` ever fails with "local changes would be overwritten" on one of these three
+(Milestones aren't part of this — they're pulled live from your Extra Life participant page's
+Fundraiser Milestones instead of stored locally at all. See "Donation milestones" below.)
+
+**If a `git pull` ever fails with "local changes would be overwritten" on one of these two
 files** (shouldn't happen anymore now that they're gitignored, but if you're recovering from
 before this change): back up the live file, let git have its way, restore your backup —
 nothing is lost:
@@ -45,9 +47,9 @@ Copy-Item public\donation-tiers.backup.json public\donation-tiers.json -Force
 pm2 restart nom-charity-overlay
 ```
 
-(Swap in `milestones.json` or `public\asset-images.json` if the conflict is on one of those
-instead.) The server normalizes the sound file format on every boot regardless of which
-schema version your restored file is in, so nothing needs to match exactly.
+(Swap in `public\asset-images.json` if the conflict is on that one instead.) The server
+normalizes the sound file format on every boot regardless of which schema version your
+restored file is in, so nothing needs to match exactly.
 
 ## Configuration
 
@@ -189,9 +191,9 @@ window into a solid card rather than a broken edge.
 
 Larger donations get a bigger, longer, more glowing "A New Hero Approaches!" alert, plus a
 sound. Thresholds, per-tier duration, and each tier's sound files are configured in
-`public/donation-tiers.json` (a purely client-side/presentational config — unlike
-`milestones.json`, the backend doesn't need to know about tiers at all except when the admin
-portal is adding/removing a sound):
+`public/donation-tiers.json` (a purely client-side/presentational config — unlike milestones,
+the backend doesn't need to know about tiers at all except when the admin portal is
+adding/removing a sound):
 
 ```json
 [
@@ -250,21 +252,17 @@ the overlay just stays on Tavern — no configuration needed to disable it.
 
 ## Donation milestones
 
-Milestones are configured in `milestones.json` (repo root) — edit this file whenever you want
-to change the amounts or reward text, no code changes needed:
+Milestones aren't configured in this repo at all — they're pulled directly from your Extra
+Life participant page's **Fundraiser Milestones** (`GET /api/participants/{id}/milestones`,
+the DonorDrive API), the same feature that shows a "Pie in the face at $250!" style list on
+your donation page. Set them up there (edit your participant page on extra-life.org) and the
+overlay picks them up automatically — no code or file changes needed here.
 
-```json
-[
-  { "amount": 250, "label": "Milestone reward TBD" },
-  { "amount": 500, "label": "Milestone reward TBD" },
-  { "amount": 750, "label": "Milestone reward TBD" },
-  { "amount": 1000, "label": "Goal Reached!" }
-]
-```
-
-Placeholder amounts/labels are already in there — replace them with your real milestones
-(e.g. `"Shave my head!"`, `"Extra hour on the timer"`) any time, then `pm2 restart
-nom-charity-overlay` (or re-run `deploy.ps1`) to pick up the change.
+The server re-fetches the list every 5 minutes (milestones don't change mid-stream, so there's
+no need to poll as often as donations/totals), maps each one's `fundraisingGoal`/`description`
+onto the same `{amount, label}` shape the overlay already used, and shows only the active
+ones. The admin portal's "Fundraiser Incentives"-style **Milestones** panel is read-only —
+it's just showing you what's live on your Extra Life page, not editing anything locally.
 
 Each milestone shows up in two places:
 
@@ -312,10 +310,9 @@ What it can do:
   milestone alert (any amount/label) on demand. These are visual/audio previews only — they
   never touch the real timer, `totalRaised`, or the "Latest Hero" display, so testing mid-stream
   is safe.
-- **Milestone editor** — add/edit/remove milestones through a form instead of hand-editing
-  `milestones.json`. Saving rewrites the file and silently recomputes which milestones count as
-  already-reached against the current total (same baseline logic as a server restart — no alert
-  spam from an edit).
+- **Milestones panel** — read-only. Shows whatever Fundraiser Milestones are currently live on
+  your Extra Life participant page (see "Donation milestones" above); to change amounts/reward
+  text, edit them there, not here.
 - **Sound upload** — add or remove donation alert sounds per tier directly from the browser,
   each with a play-preview button; the overlay picks one at random per alert (see "Donation
   alert tiers + sound" above). Takes effect immediately, no restart needed.
