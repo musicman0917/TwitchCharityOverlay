@@ -208,6 +208,40 @@
     margin-bottom: 10px;
   }
 
+  .incentive-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .incentive-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    padding: 8px 12px;
+  }
+
+  .incentive-item.inactive { opacity: 0.5; }
+
+  .incentive-amount {
+    flex: 0 0 auto;
+    font-weight: 700;
+    color: var(--gold-bright);
+  }
+
+  .incentive-desc {
+    flex: 1 1 auto;
+    font-size: 13px;
+  }
+
+  .incentive-meta {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
   .tier-add-row {
     display: flex;
     gap: 8px;
@@ -382,6 +416,15 @@
     </div>
 
     <div class="panel">
+      <h2>Fundraiser Incentives</h2>
+      <p class="subtitle" style="margin-bottom: 12px;">
+        Read-only — pulled straight from your Extra Life participant page (Incentives are set
+        up there, not here). Refreshes automatically every few minutes.
+      </p>
+      <div id="incentive-rows" class="incentive-list"></div>
+    </div>
+
+    <div class="panel">
       <h2>Donation Alert Sounds</h2>
       <p class="subtitle" style="margin-bottom: 12px;">
         Each tier can have multiple sounds — the overlay picks one at random per alert.
@@ -507,6 +550,50 @@
       btn.className = active ? 'danger' : '';
     }
 
+    function renderIncentives(incentives) {
+      const container = document.getElementById('incentive-rows');
+      container.innerHTML = '';
+      const list = Array.isArray(incentives) ? incentives : [];
+
+      if (list.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'tier-empty';
+        empty.textContent = 'No incentives found on your Extra Life participant page.';
+        container.appendChild(empty);
+        return;
+      }
+
+      for (const incentive of list) {
+        const item = document.createElement('div');
+        item.className = `incentive-item${incentive.isActive === false ? ' inactive' : ''}`;
+
+        const amount = document.createElement('span');
+        amount.className = 'incentive-amount';
+        amount.textContent = formatMoney(incentive.amount);
+
+        const desc = document.createElement('span');
+        desc.className = 'incentive-desc';
+        desc.textContent = incentive.description || '';
+
+        item.appendChild(amount);
+        item.appendChild(desc);
+
+        if (incentive.isActive === false) {
+          const meta = document.createElement('span');
+          meta.className = 'incentive-meta';
+          meta.textContent = 'inactive';
+          item.appendChild(meta);
+        } else if (typeof incentive.quantity === 'number') {
+          const meta = document.createElement('span');
+          meta.className = 'incentive-meta';
+          meta.textContent = `${incentive.quantityClaimed || 0}/${incentive.quantity} claimed`;
+          item.appendChild(meta);
+        }
+
+        container.appendChild(item);
+      }
+    }
+
     function renderStatus(state) {
       document.getElementById('status-timer').textContent = formatTimer(state.currentTimer);
       document.getElementById('status-total').textContent = formatMoney(state.totalRaised);
@@ -514,6 +601,7 @@
       renderScheduleStatus(state.scheduledStartAt);
       renderBaseStatus(state.baseSeconds);
       renderDoubleTimeStatus(state.doubleTimeActive);
+      renderIncentives(state.incentives);
       const pill = document.getElementById('status-pill');
       if (state.timerPaused) {
         pill.textContent = 'PAUSED';
@@ -568,6 +656,9 @@
     });
     socket.on('doubleTimeUpdate', (data) => {
       renderDoubleTimeStatus(data.doubleTimeActive);
+    });
+    socket.on('incentivesUpdate', (data) => {
+      renderIncentives(data.incentives);
     });
 
     // -- Timer controls --

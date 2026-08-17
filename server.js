@@ -47,6 +47,7 @@ if (!ADMIN_PASSWORD) {
 
 const PARTICIPANT_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}`;
 const DONATIONS_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}/donations`;
+const INCENTIVES_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}/incentives`;
 
 const donorDriveClient = axios.create({
   timeout: 10000,
@@ -264,6 +265,10 @@ const state = {
   // When on, every donation adds double the usual time to the timer -- for
   // bonus-time streams/days (toggled manually via the admin portal).
   doubleTimeActive: persisted.doubleTimeActive ?? false,
+  // Fundraiser Incentives from DonorDrive (e.g. "$50 - I'll do a dare!").
+  // Not persisted -- cheap to re-fetch on boot, and always shown fresh from
+  // the API rather than a possibly-stale snapshot.
+  incentives: [],
 };
 
 function saveState() {
@@ -325,6 +330,7 @@ function serializeState() {
     timerPaused: state.timerPaused,
     scheduledStartAt: state.scheduledStartAt,
     doubleTimeActive: state.doubleTimeActive,
+    incentives: state.incentives,
   };
 }
 
@@ -486,6 +492,27 @@ async function pollExtraLife() {
 // Kick off an initial poll immediately, then repeat on the interval.
 pollExtraLife();
 setInterval(pollExtraLife, POLL_INTERVAL_MS);
+
+// Fundraiser Incentives ("$50 - I'll do a dare!") change far less often than
+// donations/totals, so they're fetched on their own much slower cadence
+// instead of joining the main POLL_INTERVAL_MS loop -- no need to hammer the
+// API for data that basically never changes mid-stream.
+const INCENTIVES_POLL_INTERVAL_MS = 5 * 60 * 1000;
+
+async function pollIncentives() {
+  try {
+    const { data } = await donorDriveClient.get(INCENTIVES_URL);
+    if (Array.isArray(data)) {
+      state.incentives = data;
+      io.emit('incentivesUpdate', { incentives: state.incentives });
+    }
+  } catch (err) {
+    console.error('[poll] failed to fetch incentives:', err.message);
+  }
+}
+
+pollIncentives();
+setInterval(pollIncentives, INCENTIVES_POLL_INTERVAL_MS);
 
 // ---------------------------------------------------------------------------
 // NOM Alerts theme sync — live via SSE from nom-token-broker's /alerts-stream,
