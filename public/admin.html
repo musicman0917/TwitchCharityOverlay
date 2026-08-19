@@ -299,7 +299,7 @@
       <div class="status-line">Theme: <strong id="status-theme">—</strong></div>
       <div class="status-line">Scheduled auto-resume: <strong id="status-schedule">None</strong></div>
       <div class="status-line">Base timer duration: <strong id="status-base">--:--:--</strong></div>
-      <div class="status-line">Double time: <strong id="status-double-time">OFF</strong></div>
+      <div class="status-line">Bonus time: <strong id="status-bonus-time">OFF</strong></div>
     </div>
 
     <div class="panel">
@@ -354,14 +354,14 @@
       <div class="msg" id="schedule-msg"></div>
 
       <div class="row" style="margin-top: 16px; border-top: 1px solid var(--panel-border); padding-top: 14px;">
-        <div><button id="double-time-btn">Enable Double Time</button></div>
+        <div><button id="bonus-time-btn">Enable Bonus Time</button></div>
       </div>
       <p class="subtitle" style="margin: 0;">
-        While on, every donation adds double the usual time to the timer (e.g. $1 = +2
-        minutes instead of +1) — turn this on for a bonus-time stream/day, and remember to
-        turn it back off afterward.
+        While on, every donation adds 5 minutes per dollar instead of the usual 1 (e.g. $1 =
+        +5 minutes) — turn this on for a bonus-time stream/day (like the birthday stream), and
+        remember to turn it back off afterward.
       </p>
-      <div class="msg" id="double-time-msg"></div>
+      <div class="msg" id="bonus-time-msg"></div>
     </div>
 
     <div class="panel">
@@ -531,10 +531,10 @@
       document.getElementById('reset-btn').textContent = `Reset to ${formatTimer(baseSeconds)}`;
     }
 
-    function renderDoubleTimeStatus(active) {
-      document.getElementById('status-double-time').textContent = active ? 'ON (2x)' : 'OFF';
-      const btn = document.getElementById('double-time-btn');
-      btn.textContent = active ? 'Disable Double Time' : 'Enable Double Time';
+    function renderBonusTimeStatus(active) {
+      document.getElementById('status-bonus-time').textContent = active ? 'ON (5 min/$)' : 'OFF';
+      const btn = document.getElementById('bonus-time-btn');
+      btn.textContent = active ? 'Disable Bonus Time' : 'Enable Bonus Time';
       btn.className = active ? 'danger' : '';
     }
 
@@ -588,7 +588,7 @@
       document.getElementById('status-theme').textContent = state.theme;
       renderScheduleStatus(state.scheduledStartAt);
       renderBaseStatus(state.baseSeconds);
-      renderDoubleTimeStatus(state.doubleTimeActive);
+      renderBonusTimeStatus(state.bonusTimeActive);
       renderIncentives(state.incentives);
       renderMilestoneRows(state.milestones);
       const pill = document.getElementById('status-pill');
@@ -643,8 +643,8 @@
       currentTiers = data.donationTiers;
       renderTierBlocks();
     });
-    socket.on('doubleTimeUpdate', (data) => {
-      renderDoubleTimeStatus(data.doubleTimeActive);
+    socket.on('bonusTimeUpdate', (data) => {
+      renderBonusTimeStatus(data.bonusTimeActive);
     });
     socket.on('incentivesUpdate', (data) => {
       renderIncentives(data.incentives);
@@ -757,24 +757,24 @@
       msgEl.className = `msg ${res.ok ? 'ok' : 'err'}`;
     });
 
-    document.getElementById('double-time-btn').addEventListener('click', async () => {
-      const msgEl = document.getElementById('double-time-msg');
-      const currentlyActive = document.getElementById('status-double-time').textContent.startsWith('ON');
+    document.getElementById('bonus-time-btn').addEventListener('click', async () => {
+      const msgEl = document.getElementById('bonus-time-msg');
+      const currentlyActive = document.getElementById('status-bonus-time').textContent.startsWith('ON');
       const enabled = !currentlyActive;
-      const res = await apiFetch('/admin/timer/double-time', {
+      const res = await apiFetch('/admin/timer/bonus-time', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled }),
       });
       if (res.ok) {
         const data = await res.json();
-        renderDoubleTimeStatus(data.doubleTimeActive);
-        msgEl.textContent = data.doubleTimeActive
-          ? 'Double time enabled — donations now add 2x time.'
-          : 'Double time disabled.';
+        renderBonusTimeStatus(data.bonusTimeActive);
+        msgEl.textContent = data.bonusTimeActive
+          ? 'Bonus time enabled — donations now add 5 minutes per dollar.'
+          : 'Bonus time disabled.';
         msgEl.className = 'msg ok';
       } else {
-        msgEl.textContent = 'Failed to toggle double time.';
+        msgEl.textContent = 'Failed to toggle bonus time.';
         msgEl.className = 'msg err';
       }
     });

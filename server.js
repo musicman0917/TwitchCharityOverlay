@@ -24,6 +24,7 @@ const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 15000);
 const DEFAULT_STARTING_HOURS = Number(process.env.STARTING_HOURS || 4);
 const DEFAULT_STARTING_SECONDS = DEFAULT_STARTING_HOURS * 60 * 60;
 const SECONDS_PER_DOLLAR = 60; // +1 minute per $1 donated
+const BONUS_TIME_SECONDS_PER_DOLLAR = 5 * 60; // +5 minutes per $1 donated while Bonus Time is active (e.g. the birthday stream)
 
 // NOM Alerts (nom-token-broker) theme sync — shares whatever theme is
 // selected from admin.html on the Alerts overlay. NOM Alerts supports more
@@ -222,9 +223,10 @@ const state = {
   // any later restart, including ones that happen mid-stream.
   timerPaused: persisted.timerPaused ?? true,
   scheduledStartAt: persisted.scheduledStartAt ?? null, // ISO string or null
-  // When on, every donation adds double the usual time to the timer -- for
-  // bonus-time streams/days (toggled manually via the admin portal).
-  doubleTimeActive: persisted.doubleTimeActive ?? false,
+  // When on, every donation adds BONUS_TIME_SECONDS_PER_DOLLAR instead of
+  // SECONDS_PER_DOLLAR -- for bonus-time streams/days like the birthday
+  // stream (toggled manually via the admin portal).
+  bonusTimeActive: persisted.bonusTimeActive ?? false,
   // Fundraiser Incentives from DonorDrive (e.g. "$50 - I'll do a dare!").
   // Not persisted -- cheap to re-fetch on boot, and always shown fresh from
   // the API rather than a possibly-stale snapshot.
@@ -249,7 +251,7 @@ function saveState() {
     milestonesChecked: state.milestonesChecked,
     timerPaused: state.timerPaused,
     scheduledStartAt: state.scheduledStartAt,
-    doubleTimeActive: state.doubleTimeActive,
+    bonusTimeActive: state.bonusTimeActive,
     milestones: state.milestones,
   };
   fs.writeFileSync(STATE_FILE, JSON.stringify(snapshot, null, 2));
@@ -295,7 +297,7 @@ function serializeState() {
     milestones: serializeMilestones(),
     timerPaused: state.timerPaused,
     scheduledStartAt: state.scheduledStartAt,
-    doubleTimeActive: state.doubleTimeActive,
+    bonusTimeActive: state.bonusTimeActive,
     incentives: state.incentives,
   };
 }
@@ -432,14 +434,14 @@ async function pollDonations() {
         ? donation.displayName.trim()
         : 'Anonymous';
 
-      const timeMultiplier = state.doubleTimeActive ? 2 : 1;
-      const secondsToAdd = Math.floor(amount) * SECONDS_PER_DOLLAR * timeMultiplier;
+      const perDollarRate = state.bonusTimeActive ? BONUS_TIME_SECONDS_PER_DOLLAR : SECONDS_PER_DOLLAR;
+      const secondsToAdd = Math.floor(amount) * perDollarRate;
       state.currentTimer += secondsToAdd;
 
       state.latestDonorName = name;
       state.latestDonorAmount = amount;
 
-      console.log(`[donation] ${name} donated $${amount.toFixed(2)} (+${secondsToAdd}s${timeMultiplier > 1 ? `, ${timeMultiplier}x double time` : ''})`);
+      console.log(`[donation] ${name} donated $${amount.toFixed(2)} (+${secondsToAdd}s${state.bonusTimeActive ? ', bonus time active' : ''})`);
 
       io.emit('newDonation', { name, amount });
       io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
@@ -721,14 +723,15 @@ app.post('/admin/timer/schedule/clear', requireAdminAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Doubles the per-dollar time bonus (see SECONDS_PER_DOLLAR) for bonus-time
-// streams/days -- e.g. $1 becomes +2 minutes instead of +1 while active.
-app.post('/admin/timer/double-time', requireAdminAuth, (req, res) => {
-  state.doubleTimeActive = !!(req.body && req.body.enabled);
-  console.log(`[timer] double time ${state.doubleTimeActive ? 'enabled' : 'disabled'}`);
-  io.emit('doubleTimeUpdate', { doubleTimeActive: state.doubleTimeActive });
+// Switches the per-dollar time bonus from SECONDS_PER_DOLLAR to
+// BONUS_TIME_SECONDS_PER_DOLLAR for bonus-time streams/days (e.g. $1
+// becomes +5 minutes instead of +1 while active).
+app.post('/admin/timer/bonus-time', requireAdminAuth, (req, res) => {
+  state.bonusTimeActive = !!(req.body && req.body.enabled);
+  console.log(`[timer] bonus time ${state.bonusTimeActive ? 'enabled' : 'disabled'}`);
+  io.emit('bonusTimeUpdate', { bonusTimeActive: state.bonusTimeActive });
   saveState();
-  res.json({ ok: true, doubleTimeActive: state.doubleTimeActive });
+  res.json({ ok: true, bonusTimeActive: state.bonusTimeActive });
 });
 
 // -- Test alerts — visual/audio preview only, never touches real state --
