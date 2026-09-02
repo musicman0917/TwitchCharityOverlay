@@ -70,6 +70,10 @@ const DONATION_TIERS_FILE = path.join(__dirname, 'public', 'donation-tiers.json'
 const SOUNDS_DIR = path.join(__dirname, 'public', 'Assets', 'Sounds');
 const ASSET_IMAGES_FILE = path.join(__dirname, 'public', 'asset-images.json');
 const IMAGES_DIR = path.join(__dirname, 'public', 'Assets', 'Images');
+// Zoo events (Cincinnati Zoo showtimes for the 9/17 birthday stream) -- the
+// zoo has no public API for this, so unlike milestones/incentives, this
+// really is a locally-edited list (admin enters the day's schedule by hand).
+const ZOO_EVENTS_FILE = path.join(__dirname, 'zoo-events.json');
 
 // donation-tiers.json / asset-images.json are gitignored once they exist --
 // the admin portal mutates them live, and tracking them in git would mean
@@ -89,6 +93,36 @@ function seedFromExample(targetFile, exampleFile) {
 
 seedFromExample(DONATION_TIERS_FILE, path.join(__dirname, 'public', 'donation-tiers.example.json'));
 seedFromExample(ASSET_IMAGES_FILE, path.join(__dirname, 'public', 'asset-images.example.json'));
+seedFromExample(ZOO_EVENTS_FILE, path.join(__dirname, 'zoo-events.example.json'));
+
+function loadZooEvents() {
+  try {
+    const raw = fs.readFileSync(ZOO_EVENTS_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('zoo-events.json must be a JSON array');
+    return parsed
+      .filter((e) => typeof e.time === 'string' && typeof e.label === 'string')
+      .sort((a, b) => new Date(a.time) - new Date(b.time));
+  } catch (err) {
+    console.warn(`[zoo-events] could not load zoo-events.json (${err.message}); no zoo events configured`);
+    return [];
+  }
+}
+
+let zooEvents = loadZooEvents();
+
+function saveZooEvents(newZooEvents) {
+  const cleaned = newZooEvents
+    .filter((e) => typeof e.time === 'string' && !Number.isNaN(new Date(e.time).getTime()) && typeof e.label === 'string' && e.label.trim())
+    .map((e) => ({ time: new Date(e.time).toISOString(), label: e.label.trim() }))
+    .sort((a, b) => new Date(a.time) - new Date(b.time));
+
+  fs.writeFileSync(ZOO_EVENTS_FILE, JSON.stringify(cleaned, null, 2) + '\n');
+  zooEvents = cleaned;
+  console.log(`[zoo-events] admin updated zoo-events.json (${zooEvents.length} event(s))`);
+  io.emit('zooEventsUpdate', { zooEvents, zooEventsActive: state.zooEventsActive });
+  return zooEvents;
+}
 
 // Each sound is normalized to { path, name } -- `name` is the original
 // uploaded filename (e.g. "cash-register.mp3"), shown in the admin portal
@@ -236,6 +270,11 @@ const state = {
   // stream time doesn't blank out the goal-bar markers/next-milestone
   // callout -- overwritten as soon as the next poll succeeds.
   milestones: Array.isArray(persisted.milestones) ? persisted.milestones : [],
+  // Shows the "Next Zoo Event" callout on the overlay when on -- meant to be
+  // toggled on for the 9/17 birthday stream's Cincinnati Zoo segment only,
+  // and back off afterward. The event list itself (zooEvents) lives outside
+  // of state, in zoo-events.json, same as donation-tiers/asset-images.
+  zooEventsActive: persisted.zooEventsActive ?? false,
 };
 
 function saveState() {
@@ -253,6 +292,7 @@ function saveState() {
     scheduledStartAt: state.scheduledStartAt,
     bonusTimeActive: state.bonusTimeActive,
     milestones: state.milestones,
+    zooEventsActive: state.zooEventsActive,
   };
   fs.writeFileSync(STATE_FILE, JSON.stringify(snapshot, null, 2));
 }
@@ -299,6 +339,8 @@ function serializeState() {
     scheduledStartAt: state.scheduledStartAt,
     bonusTimeActive: state.bonusTimeActive,
     incentives: state.incentives,
+    zooEvents: zooEvents,
+    zooEventsActive: state.zooEventsActive,
   };
 }
 
@@ -732,6 +774,24 @@ app.post('/admin/timer/bonus-time', requireAdminAuth, (req, res) => {
   io.emit('bonusTimeUpdate', { bonusTimeActive: state.bonusTimeActive });
   saveState();
   res.json({ ok: true, bonusTimeActive: state.bonusTimeActive });
+});
+
+// -- Zoo events editor (Cincinnati Zoo showtimes for the 9/17 stream) --
+app.post('/admin/zoo-events', requireAdminAuth, (req, res) => {
+  const incoming = req.body && req.body.zooEvents;
+  if (!Array.isArray(incoming)) {
+    return res.status(400).json({ error: 'zooEvents must be an array' });
+  }
+  const saved = saveZooEvents(incoming);
+  res.json({ ok: true, zooEvents: saved });
+});
+
+app.post('/admin/zoo-events/toggle', requireAdminAuth, (req, res) => {
+  state.zooEventsActive = !!(req.body && req.body.enabled);
+  console.log(`[zoo-events] ${state.zooEventsActive ? 'enabled' : 'disabled'}`);
+  io.emit('zooEventsUpdate', { zooEvents, zooEventsActive: state.zooEventsActive });
+  saveState();
+  res.json({ ok: true, zooEventsActive: state.zooEventsActive });
 });
 
 // -- Test alerts — visual/audio preview only, never touches real state --

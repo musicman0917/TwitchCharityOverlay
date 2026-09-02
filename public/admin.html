@@ -132,6 +132,16 @@
   .pill.running { background: rgba(107, 168, 107, 0.2); color: var(--success); }
   .pill.paused { background: rgba(200, 92, 74, 0.2); color: var(--danger); }
 
+  .zoo-event-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .zoo-event-row input[type="text"] { flex: 1 1 auto; }
+  .zoo-event-row input[type="datetime-local"] { flex: 0 0 auto; }
+
   .tier-row {
     display: flex;
     gap: 12px;
@@ -300,6 +310,7 @@
       <div class="status-line">Scheduled auto-resume: <strong id="status-schedule">None</strong></div>
       <div class="status-line">Base timer duration: <strong id="status-base">--:--:--</strong></div>
       <div class="status-line">Bonus time: <strong id="status-bonus-time">OFF</strong></div>
+      <div class="status-line">Zoo events: <strong id="status-zoo-events">OFF</strong></div>
     </div>
 
     <div class="panel">
@@ -362,6 +373,27 @@
         remember to turn it back off afterward.
       </p>
       <div class="msg" id="bonus-time-msg"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Zoo Events (9/17 Stream)</h2>
+      <p class="subtitle" style="margin-bottom: 12px;">
+        The Cincinnati Zoo has no public schedule API, so this list is entered by hand — add
+        that day's showtimes here. The overlay pops up a "Next At The Zoo" callout every ~90
+        seconds while the toggle below is on, showing whichever event is coming up next.
+        Meant to be turned on only during the zoo segment of the 9/17 stream, then off again.
+      </p>
+      <div id="zoo-event-rows"></div>
+      <div class="row">
+        <div style="flex: 0 0 auto;"><button class="secondary" id="add-zoo-event-btn">+ Add Event</button></div>
+        <div style="flex: 0 0 auto;"><button id="save-zoo-events-btn">Save Events</button></div>
+      </div>
+      <div class="msg" id="zoo-events-msg"></div>
+
+      <div class="row" style="margin-top: 16px; border-top: 1px solid var(--panel-border); padding-top: 14px;">
+        <div><button id="zoo-events-btn">Enable Zoo Events</button></div>
+      </div>
+      <div class="msg" id="zoo-events-toggle-msg"></div>
     </div>
 
     <div class="panel">
@@ -538,6 +570,48 @@
       btn.className = active ? 'danger' : '';
     }
 
+    function renderZooEventsStatus(active) {
+      document.getElementById('status-zoo-events').textContent = active ? 'ON' : 'OFF';
+      const btn = document.getElementById('zoo-events-btn');
+      btn.textContent = active ? 'Disable Zoo Events' : 'Enable Zoo Events';
+      btn.className = active ? 'danger' : '';
+    }
+
+    function toDatetimeLocalValue(isoString) {
+      const d = new Date(isoString);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function renderZooEventRows(zooEvents) {
+      const container = document.getElementById('zoo-event-rows');
+      container.innerHTML = '';
+      (Array.isArray(zooEvents) ? zooEvents : []).forEach((e) => addZooEventRow(e.time, e.label));
+    }
+
+    function addZooEventRow(time, label) {
+      const container = document.getElementById('zoo-event-rows');
+      const row = document.createElement('div');
+      row.className = 'zoo-event-row';
+
+      const timeInput = document.createElement('input');
+      timeInput.type = 'datetime-local';
+      timeInput.value = time ? toDatetimeLocalValue(time) : '';
+
+      const labelInput = document.createElement('input');
+      labelInput.type = 'text';
+      labelInput.placeholder = 'Event name';
+      labelInput.value = label != null ? label : '';
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'secondary';
+      removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => row.remove());
+
+      row.append(timeInput, labelInput, removeBtn);
+      container.appendChild(row);
+    }
+
     function renderIncentives(incentives) {
       const container = document.getElementById('incentive-rows');
       container.innerHTML = '';
@@ -591,6 +665,8 @@
       renderBonusTimeStatus(state.bonusTimeActive);
       renderIncentives(state.incentives);
       renderMilestoneRows(state.milestones);
+      renderZooEventsStatus(state.zooEventsActive);
+      renderZooEventRows(state.zooEvents);
       const pill = document.getElementById('status-pill');
       if (state.timerPaused) {
         pill.textContent = 'PAUSED';
@@ -648,6 +724,10 @@
     });
     socket.on('incentivesUpdate', (data) => {
       renderIncentives(data.incentives);
+    });
+    socket.on('zooEventsUpdate', (data) => {
+      renderZooEventsStatus(data.zooEventsActive);
+      renderZooEventRows(data.zooEvents);
     });
 
     // -- Timer controls --
@@ -775,6 +855,59 @@
         msgEl.className = 'msg ok';
       } else {
         msgEl.textContent = 'Failed to toggle bonus time.';
+        msgEl.className = 'msg err';
+      }
+    });
+
+    document.getElementById('add-zoo-event-btn').addEventListener('click', () => {
+      addZooEventRow('', '');
+    });
+
+    document.getElementById('save-zoo-events-btn').addEventListener('click', async () => {
+      const rows = document.querySelectorAll('#zoo-event-rows .zoo-event-row');
+      const zooEvents = [];
+      for (const row of rows) {
+        const [timeInput, labelInput] = row.querySelectorAll('input');
+        const label = labelInput.value.trim();
+        if (timeInput.value && label) {
+          zooEvents.push({ time: new Date(timeInput.value).toISOString(), label });
+        }
+      }
+      const msgEl = document.getElementById('zoo-events-msg');
+      const res = await apiFetch('/admin/zoo-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zooEvents }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        renderZooEventRows(data.zooEvents);
+        msgEl.textContent = 'Zoo events saved.';
+        msgEl.className = 'msg ok';
+      } else {
+        msgEl.textContent = 'Failed to save zoo events.';
+        msgEl.className = 'msg err';
+      }
+    });
+
+    document.getElementById('zoo-events-btn').addEventListener('click', async () => {
+      const msgEl = document.getElementById('zoo-events-toggle-msg');
+      const currentlyActive = document.getElementById('status-zoo-events').textContent === 'ON';
+      const enabled = !currentlyActive;
+      const res = await apiFetch('/admin/zoo-events/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        renderZooEventsStatus(data.zooEventsActive);
+        msgEl.textContent = data.zooEventsActive
+          ? 'Zoo events enabled — the "Next At The Zoo" callout will start popping up.'
+          : 'Zoo events disabled.';
+        msgEl.className = 'msg ok';
+      } else {
+        msgEl.textContent = 'Failed to toggle zoo events.';
         msgEl.className = 'msg err';
       }
     });

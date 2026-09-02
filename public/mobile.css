@@ -88,6 +88,10 @@ html, body {
   max-width: 300px;
 }
 
+.next-zoo-event-text {
+  max-width: 300px;
+}
+
 /* --------------------------------------------------------------------------
    Milestone alert — same fixed width works fine centered on a 1080-wide
    canvas, just tightened slightly so it doesn't crowd the edges.

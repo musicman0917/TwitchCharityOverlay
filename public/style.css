@@ -524,6 +524,73 @@ html, body {
 }
 
 /* --------------------------------------------------------------------------
+   Next zoo event callout — same idea as "Next Milestone", but for the 9/17
+   birthday stream's Cincinnati Zoo segment only (toggled via admin portal).
+   Sits 68px higher than the milestone callout so the two never overlap if
+   they happen to both be visible at once.
+   -------------------------------------------------------------------------- */
+.next-zoo-event {
+  position: fixed;
+  bottom: 240px;
+  left: 50%;
+  transform: translate(-50%, 12px);
+  z-index: 6;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 24px;
+  background:
+    radial-gradient(ellipse at top, rgba(255, 255, 255, 0.08), transparent 60%),
+    linear-gradient(160deg, var(--card-bg-1) 0%, var(--card-bg-2) 100%);
+  border: 3px solid var(--card-border);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px var(--shadow), inset 0 0 16px var(--glow-inner);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.4s ease, border-color 0.4s ease, visibility 0s linear 0.5s;
+}
+
+.next-zoo-event.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.4s ease, border-color 0.4s ease, visibility 0s linear 0s;
+}
+
+.next-zoo-event-label {
+  font-family: var(--font-title);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--label-color);
+  transition: color 0.4s ease;
+}
+
+.next-zoo-event-time {
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold);
+  transition: color 0.4s ease;
+}
+
+.next-zoo-event-text {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--body-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+  transition: color 0.4s ease;
+}
+
+/* --------------------------------------------------------------------------
    Milestone alert — big full-screen popup when a milestone is crossed
    -------------------------------------------------------------------------- */
 .milestone-alert {

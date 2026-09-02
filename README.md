@@ -19,17 +19,18 @@ cp .env.example .env   # then edit .env and set a real ADMIN_PASSWORD
 `.env` is gitignored — this repo is public, so never commit real secrets. `deploy.ps1`
 creates `.env` from `.env.example` automatically on first install if it's missing.
 
-## Local data files (donation sounds / asset images)
+## Local data files (donation sounds / asset images / zoo events)
 
-`public/donation-tiers.json` and `public/asset-images.json` are **not** tracked in git —
-they're real data the admin portal mutates live on your server (sounds you've uploaded, logos
-you've uploaded), and tracking them would mean any future code update could conflict with or
-overwrite what's actually running.
+`public/donation-tiers.json`, `public/asset-images.json`, and `zoo-events.json` are **not**
+tracked in git — they're real data the admin portal mutates live on your server (sounds you've
+uploaded, logos you've uploaded, the 9/17 zoo schedule you've entered), and tracking them would
+mean any future code update could conflict with or overwrite what's actually running.
 
 Each is seeded automatically from its committed `*.example.json` template
-(`public/donation-tiers.example.json`, `public/asset-images.example.json`) the first time
-`server.js` boots and finds it missing — after that, it's purely local. To change the *shipped
-defaults* for a fresh install, edit the `.example.json` file, not the live one.
+(`public/donation-tiers.example.json`, `public/asset-images.example.json`,
+`zoo-events.example.json`) the first time `server.js` boots and finds it missing — after that,
+it's purely local. To change the *shipped defaults* for a fresh install, edit the
+`.example.json` file, not the live one.
 
 (Milestones aren't part of this — they're pulled live from your Extra Life participant page's
 Fundraiser Milestones instead of stored locally at all. See "Donation milestones" below.)
@@ -283,6 +284,17 @@ replay a pile of alerts for progress that already happened.
 
 Milestone amounts are independent of `GOAL_AMOUNT` — the goal bar always scales to
 `GOAL_AMOUNT`, so a milestone set above it will show its marker pinned at the right edge.
+
+## Zoo events (9/17 birthday stream only)
+
+The Cincinnati Zoo has no public schedule API, so this one really is a locally-edited list —
+unlike milestones/incentives above. Enter that day's showtimes (time + name) in the admin
+portal's **Zoo Events** panel, then flip on the **Enable Zoo Events** toggle only during the
+zoo segment of the stream (turn it back off afterward). While on, a "Next At The Zoo" callout
+pops in every ~90 seconds for ~8 seconds — same cadence as "Next Milestone," just showing
+whichever zoo event is coming up next by the clock instead of a donation amount. Shows nothing
+if the toggle is off, or once every event for the day has already passed. Appears on both the
+main overlay and the vertical/mobile overlay.
 
 ## Admin portal
 

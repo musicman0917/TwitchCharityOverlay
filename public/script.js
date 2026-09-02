@@ -20,8 +20,14 @@ const nextMilestoneEl = document.getElementById('next-milestone');
 const nextMilestoneAmountEl = document.getElementById('next-milestone-amount');
 const nextMilestoneTextEl = document.getElementById('next-milestone-text');
 
+const nextZooEventEl = document.getElementById('next-zoo-event');
+const nextZooEventTimeEl = document.getElementById('next-zoo-event-time');
+const nextZooEventTextEl = document.getElementById('next-zoo-event-text');
+
 let goal = 1000;
 let milestonesData = [];
+let zooEvents = [];
+let zooEventsActive = false;
 
 function applyTheme(theme) {
   const root = document.documentElement;
@@ -119,6 +125,44 @@ setTimeout(() => {
   showNextMilestoneCallout();
   setInterval(showNextMilestoneCallout, NEXT_MILESTONE_INTERVAL_MS);
 }, NEXT_MILESTONE_INITIAL_DELAY_MS);
+
+// --------------------------------------------------------------------------
+// "Next Zoo Event" callout — same idea as "Next Milestone", but only for the
+// 9/17 birthday stream's Cincinnati Zoo segment. Toggled on/off via
+// zooEventsActive (admin portal); does nothing while off, or once every
+// event for the day has already passed.
+// --------------------------------------------------------------------------
+const NEXT_ZOO_EVENT_INITIAL_DELAY_MS = 45000; // offset from the milestone callout so they don't always coincide
+const NEXT_ZOO_EVENT_INTERVAL_MS = 90000;
+const NEXT_ZOO_EVENT_VISIBLE_MS = 8000;
+
+function getNextZooEvent() {
+  const now = Date.now();
+  return zooEvents.find((e) => new Date(e.time).getTime() > now) || null;
+}
+
+function formatEventTime(isoString) {
+  return new Date(isoString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function showNextZooEventCallout() {
+  if (!zooEventsActive) return;
+  const next = getNextZooEvent();
+  if (!next) return; // toggle is off, or no more events today
+
+  nextZooEventTimeEl.textContent = formatEventTime(next.time);
+  nextZooEventTextEl.textContent = next.label;
+  nextZooEventEl.classList.add('show');
+
+  setTimeout(() => {
+    nextZooEventEl.classList.remove('show');
+  }, NEXT_ZOO_EVENT_VISIBLE_MS);
+}
+
+setTimeout(() => {
+  showNextZooEventCallout();
+  setInterval(showNextZooEventCallout, NEXT_ZOO_EVENT_INTERVAL_MS);
+}, NEXT_ZOO_EVENT_INITIAL_DELAY_MS);
 
 // --------------------------------------------------------------------------
 // Milestone alert queue — bigger, full-screen, stays longer than a normal
@@ -286,11 +330,18 @@ socket.on('state', (data) => {
   applyTheme(data.theme);
   milestonesData = Array.isArray(data.milestones) ? data.milestones : [];
   renderMilestones();
+  zooEvents = Array.isArray(data.zooEvents) ? data.zooEvents : [];
+  zooEventsActive = !!data.zooEventsActive;
 });
 
 socket.on('milestonesUpdate', (data) => {
   milestonesData = Array.isArray(data.milestones) ? data.milestones : [];
   renderMilestones();
+});
+
+socket.on('zooEventsUpdate', (data) => {
+  zooEvents = Array.isArray(data.zooEvents) ? data.zooEvents : [];
+  zooEventsActive = !!data.zooEventsActive;
 });
 
 socket.on('milestoneReached', (data) => {

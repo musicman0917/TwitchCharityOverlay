@@ -12,6 +12,7 @@ npm-debug.log
 # Edit *.example.json instead to change the shipped defaults.
 public/donation-tiers.json
 public/asset-images.json
+zoo-events.json
 
 # Same reasoning as above, for the actual uploaded files those JSON manifests
 # point to -- keep the placeholder README in each folder tracked, but never
