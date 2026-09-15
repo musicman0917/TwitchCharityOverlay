@@ -162,9 +162,10 @@ window into a solid card rather than a broken edge.
 - The timer starts at a **base duration** (default 4 hours — set `STARTING_HOURS` before the
   first-ever boot, or change it later via the admin portal's "Base Timer Duration" control,
   which doesn't require picking a code default up front if you haven't decided yet). Every
-  dollar donated adds **60 seconds** to it. Changing the base later doesn't touch the
-  currently running countdown — it only changes what "Reset" returns it to; click Reset
-  afterward if you want the new base to apply immediately.
+  dollar donated adds **120 seconds** (2 minutes). On days when "Bonus Time" is toggled on in
+  the admin portal (see Admin portal below), that jumps to **5 minutes** per dollar instead.
+  Changing the base later doesn't touch the currently running countdown — it only changes what
+  "Reset" returns it to; click Reset afterward if you want the new base to apply immediately.
 - The server polls the Extra Life donations endpoint every 15 seconds. For every **new**
   donation it detects, it adds time and fires a `newDonation` alert on the overlay.
 - Donations that already existed the first time the server successfully polls (e.g. donations

@@ -23,7 +23,7 @@ const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 15000);
 // takes over from this default once set).
 const DEFAULT_STARTING_HOURS = Number(process.env.STARTING_HOURS || 4);
 const DEFAULT_STARTING_SECONDS = DEFAULT_STARTING_HOURS * 60 * 60;
-const SECONDS_PER_DOLLAR = 60; // +1 minute per $1 donated
+const SECONDS_PER_DOLLAR = 120; // +2 minutes per $1 donated
 const BONUS_TIME_SECONDS_PER_DOLLAR = 5 * 60; // +5 minutes per $1 donated while Bonus Time is active (e.g. the birthday stream)
 
 // NOM Alerts (nom-token-broker) theme sync — shares whatever theme is
