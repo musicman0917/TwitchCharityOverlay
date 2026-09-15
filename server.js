@@ -34,6 +34,7 @@ const BONUS_TIME_SECONDS_PER_DOLLAR = 5 * 60; // +5 minutes per $1 donated while
 const NOM_ALERTS_BASE_URL = process.env.NOM_ALERTS_BASE_URL || 'http://localhost:3010';
 const NOM_ALERTS_SSE_URL = `${NOM_ALERTS_BASE_URL}/alerts-stream`;
 const NOM_ALERTS_THEME_STATE_URL = `${NOM_ALERTS_BASE_URL}/theme-state`;
+const NOM_ALERTS_CHAT_ANNOUNCE_URL = `${NOM_ALERTS_BASE_URL}/chat/announce`;
 const SSE_RECONNECT_DELAY_MS = 5000;
 
 // Admin portal — simple shared-password auth. Not meant for internet
@@ -359,6 +360,26 @@ function setTheme(theme) {
   io.emit('themeUpdate', { theme: state.theme });
 }
 
+function formatMoneyForChat(amount) {
+  return `$${Math.round(amount).toLocaleString('en-US')}`;
+}
+
+// Posts a plain-text announcement to Twitch chat via nom-token-broker's
+// /chat/announce (it already holds the bot's Twitch OAuth token -- this
+// overlay never needs its own). Best-effort: a failure here (broker down,
+// Twitch token expired, etc.) is logged and otherwise ignored, never lets a
+// chat outage affect the timer/donation-processing it's called from.
+async function postChatAnnouncement(message) {
+  try {
+    const { data } = await nomAlertsClient.post(NOM_ALERTS_CHAT_ANNOUNCE_URL, { message });
+    if (!data || data.ok !== true) {
+      console.warn(`[chat] announce not accepted: ${JSON.stringify(data)}`);
+    }
+  } catch (err) {
+    console.warn(`[chat] failed to post announcement: ${err.message}`);
+  }
+}
+
 // Checks totalRaised against the configured milestones and fires alerts for
 // any newly-crossed ones. On the very first check (server just started, and
 // totalRaised may already be well past some milestones from before the
@@ -387,6 +408,7 @@ function checkMilestones() {
   for (const m of newlyReached) {
     console.log(`[milestone] reached $${m.amount}: ${m.label}`);
     io.emit('milestoneReached', { amount: m.amount, label: m.label });
+    postChatAnnouncement(`🏆 Milestone reached: ${formatMoneyForChat(m.amount)} — ${m.label}!`);
   }
   io.emit('milestonesUpdate', { milestones: serializeMilestones() });
 }
@@ -487,6 +509,7 @@ async function pollDonations() {
 
       io.emit('newDonation', { name, amount });
       io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
+      postChatAnnouncement(`🎉 ${formatMoneyForChat(amount)} donation from ${name}! Thank you!`);
     }
 
     if (processedAny) saveState();

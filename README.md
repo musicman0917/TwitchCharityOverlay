@@ -252,6 +252,24 @@ How it's wired up:
 If `NOM_ALERTS_BASE_URL` points somewhere unreachable, or you don't want theme sync at all,
 the overlay just stays on Tavern — no configuration needed to disable it.
 
+## Chat announcements
+
+New donations and newly-crossed milestones get posted to Twitch chat automatically, via
+`nom-token-broker`'s `POST /chat/announce` endpoint — same idea as theme sync: this overlay
+has no Twitch credentials of its own, it just asks `nom-token-broker` (which already holds the
+bot's OAuth token) to send the message. Nothing to configure beyond `NOM_ALERTS_BASE_URL`
+already being set correctly.
+
+- Donation: `🎉 $50 donation from CoolViewer! Thank you!`
+- Milestone: `🏆 Milestone reached: $500 — Shave my head!`
+
+Only *real* donations/milestones trigger this — the admin portal's Test Alerts never touch
+chat, and the startup baseline catch-up (donations/milestones that already existed before the
+overlay's first poll) is silent here too, same as it is for the on-overlay alerts. If
+`nom-token-broker` is unreachable or rejects the request (e.g. its Twitch token expired), the
+failure is logged and otherwise ignored — it never affects the timer or donation processing
+that triggered it.
+
 ## Donation milestones
 
 Milestones aren't configured in this repo at all — they're pulled directly from your Extra
