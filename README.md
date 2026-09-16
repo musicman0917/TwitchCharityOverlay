@@ -66,6 +66,7 @@ The server reads optional environment variables (all have sensible defaults exce
 | `NOM_ALERTS_BASE_URL` | `http://localhost:3010`  | Base URL of the `nom-token-broker` server, used for theme sync (see below) |
 | `ADMIN_PASSWORD`      | *(none)*                 | Password for the admin portal (`/admin.html`) — logins are rejected until this is set |
 | `DISCORD_WEBHOOK_URL` | *(none)*                 | Discord webhook for donation announcements (see below) — leave unset to disable |
+| `GIVEAWAY_EXCLUDED_NAMES` | `neighborhoodofmusic` | Comma-separated, case-insensitive display names blocked from earning giveaway entries |
 | `STARTING_HOURS`      | `4`                      | Base countdown duration in hours — only applies on the very first-ever boot (no `.overlay-state.json` yet); change it later via the admin portal instead (see below) |
 | `DONATION_REMINDER_INTERVAL_MS` | `900000` (15 min) | How often the recurring donation-link chat reminder repeats while the timer is running (see "Chat announcements" below) |
 
@@ -324,6 +325,10 @@ donation they make over the whole campaign (donate $5 today and $10 next week, a
 **Anonymous donations never earn entries**, no matter the amount — there's no way to identify
 or contact an anonymous winner. This matches the donation page's own rules ("avoid donating
 completely anonymously if you want your entries included").
+
+**`GIVEAWAY_EXCLUDED_NAMES`** (env var, comma-separated, case-insensitive; defaults to
+`neighborhoodofmusic`) blocks specific display names from earning entries regardless of
+amount — so a donation processed under the channel's own name can't win its own giveaway.
 
 The admin portal's **Giveaway** panel shows the live entry pool (name + entry count, most
 entries first) and a **🎲 Draw Winner** button — a weighted random pick, so someone with 3

@@ -21,6 +21,13 @@ const DONATION_REMINDER_INTERVAL_MS = Number(process.env.DONATION_REMINDER_INTER
 const DISCORD_MIN_DONATION_AMOUNT = 1; // Discord embed only posts for donations >= this
 const GIVEAWAY_MIN_DONATION_AMOUNT = 5; // a single donation must be at least this to earn any entries
 const GIVEAWAY_ENTRY_AMOUNT = 5; // one entry per this many dollars (e.g. $10 donation = 2 entries)
+// Names excluded from the giveaway regardless of amount (case-insensitive) --
+// e.g. the streamer's own name, so a self-donation or a donation processed
+// under the channel's own display name can't win its own giveaway.
+const GIVEAWAY_EXCLUDED_NAMES = (process.env.GIVEAWAY_EXCLUDED_NAMES || 'neighborhoodofmusic')
+  .split(',')
+  .map((n) => n.trim().toLowerCase())
+  .filter(Boolean);
 // Default base timer duration, in hours -- how long the countdown starts at
 // before any donations add time. Not final until the base is confirmed;
 // change STARTING_HOURS any time before the first-ever boot, or adjust the
@@ -485,8 +492,11 @@ async function postDiscordDonation(name, amount, secondsAdded) {
 // qualifying donation, added to that donor's running total). Purely a
 // bookkeeping side-effect of a real donation -- never touches the timer,
 // never fires from Test Alerts. Callers must skip this for anonymous
-// donations (no way to identify/contact a winner who gave anonymously).
+// donations (no way to identify/contact a winner who gave anonymously);
+// names in GIVEAWAY_EXCLUDED_NAMES (e.g. the streamer's own channel name)
+// are rejected here directly.
 function addGiveawayEntries(name, amount) {
+  if (GIVEAWAY_EXCLUDED_NAMES.includes(name.trim().toLowerCase())) return;
   if (amount < GIVEAWAY_MIN_DONATION_AMOUNT) return;
   const entries = Math.floor(amount / GIVEAWAY_ENTRY_AMOUNT);
   if (entries <= 0) return;
