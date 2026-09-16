@@ -16,6 +16,8 @@ const PORT = process.env.PORT || 3011;
 const PARTICIPANT_ID = process.env.PARTICIPANT_ID || '567118';
 const GOAL_AMOUNT = Number(process.env.GOAL_AMOUNT || 1000);
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 15000);
+const DONATION_LINK_URL = `https://dd.extra-life.org/participants/${PARTICIPANT_ID}`;
+const DONATION_REMINDER_INTERVAL_MS = Number(process.env.DONATION_REMINDER_INTERVAL_MS || 15 * 60 * 1000);
 // Default base timer duration, in hours -- how long the countdown starts at
 // before any donations add time. Not final until the base is confirmed;
 // change STARTING_HOURS any time before the first-ever boot, or adjust the
@@ -576,6 +578,18 @@ function pollMilestones() {
 
 pollMilestones();
 setInterval(pollMilestones, DONOR_DRIVE_METADATA_POLL_INTERVAL_MS);
+
+// Periodic donation-link reminder in chat -- only while the timer is
+// actually running (not paused), so it doesn't spam an empty/offline chat
+// during the multi-week lead-up before a stream. Doesn't fire immediately
+// on boot; the first reminder lands one interval after startup (or after
+// the timer's next resume), same as it would mid-stream.
+setInterval(() => {
+  if (state.timerPaused) return;
+  postChatAnnouncement(
+    `💝 Every dollar helps kids at Dayton Children's Hospital and adds time to the clock! Donate: ${DONATION_LINK_URL}`
+  );
+}, DONATION_REMINDER_INTERVAL_MS);
 
 // ---------------------------------------------------------------------------
 // NOM Alerts theme sync — live via SSE from nom-token-broker's /alerts-stream,

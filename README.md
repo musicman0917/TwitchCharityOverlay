@@ -66,6 +66,7 @@ The server reads optional environment variables (all have sensible defaults exce
 | `NOM_ALERTS_BASE_URL` | `http://localhost:3010`  | Base URL of the `nom-token-broker` server, used for theme sync (see below) |
 | `ADMIN_PASSWORD`      | *(none)*                 | Password for the admin portal (`/admin.html`) — logins are rejected until this is set |
 | `STARTING_HOURS`      | `4`                      | Base countdown duration in hours — only applies on the very first-ever boot (no `.overlay-state.json` yet); change it later via the admin portal instead (see below) |
+| `DONATION_REMINDER_INTERVAL_MS` | `900000` (15 min) | How often the recurring donation-link chat reminder repeats while the timer is running (see "Chat announcements" below) |
 
 ## Deployment (streaming PC — alongside NOM Alerts)
 
@@ -269,6 +270,16 @@ overlay's first poll) is silent here too, same as it is for the on-overlay alert
 `nom-token-broker` is unreachable or rejects the request (e.g. its Twitch token expired), the
 failure is logged and otherwise ignored — it never affects the timer or donation processing
 that triggered it.
+
+There's also a recurring reminder, every `DONATION_REMINDER_INTERVAL_MS` (default 15 minutes):
+
+> 💝 Every dollar helps kids at Dayton Children's Hospital and adds time to the clock! Donate:
+> https://dd.extra-life.org/participants/567118
+
+It only fires while the timer is actually running (`timerPaused` is `false`) — during the
+multi-week lead-up before a stream, or any time you pause for a break, it stays silent instead
+of repeating into an empty/offline chat. Resuming picks the interval back up from zero, so the
+first reminder after a resume lands a full interval later, not immediately.
 
 ## Donation milestones
 
