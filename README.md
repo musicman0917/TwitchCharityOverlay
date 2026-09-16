@@ -321,6 +321,10 @@ donation earns 2 entries), added to that donor's running total across every qual
 donation they make over the whole campaign (donate $5 today and $10 next week, and you've got
 3 entries combined). Donations under $5 don't qualify at all, even if you've donated before.
 
+**Anonymous donations never earn entries**, no matter the amount — there's no way to identify
+or contact an anonymous winner. This matches the donation page's own rules ("avoid donating
+completely anonymously if you want your entries included").
+
 The admin portal's **Giveaway** panel shows the live entry pool (name + entry count, most
 entries first) and a **🎲 Draw Winner** button — a weighted random pick, so someone with 3
 entries is 3x as likely to win as someone with 1. Drawing a winner doesn't remove them from the

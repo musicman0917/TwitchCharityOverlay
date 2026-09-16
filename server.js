@@ -484,7 +484,8 @@ async function postDiscordDonation(name, amount, secondsAdded) {
 // End-of-campaign giveaway ($5+ donations, floor(amount/5) entries per
 // qualifying donation, added to that donor's running total). Purely a
 // bookkeeping side-effect of a real donation -- never touches the timer,
-// never fires from Test Alerts.
+// never fires from Test Alerts. Callers must skip this for anonymous
+// donations (no way to identify/contact a winner who gave anonymously).
 function addGiveawayEntries(name, amount) {
   if (amount < GIVEAWAY_MIN_DONATION_AMOUNT) return;
   const entries = Math.floor(amount / GIVEAWAY_ENTRY_AMOUNT);
@@ -629,9 +630,8 @@ async function pollDonations() {
       state.processedDonationIds.add(id);
 
       const amount = Number(donation.amount) || 0;
-      const name = donation.displayName && donation.displayName.trim()
-        ? donation.displayName.trim()
-        : 'Anonymous';
+      const isAnonymous = !(donation.displayName && donation.displayName.trim());
+      const name = isAnonymous ? 'Anonymous' : donation.displayName.trim();
 
       const perDollarRate = state.bonusTimeActive ? BONUS_TIME_SECONDS_PER_DOLLAR : SECONDS_PER_DOLLAR;
       const secondsToAdd = Math.floor(amount) * perDollarRate;
@@ -648,7 +648,9 @@ async function pollDonations() {
       if (amount >= DISCORD_MIN_DONATION_AMOUNT) {
         postDiscordDonation(name, amount, secondsToAdd);
       }
-      addGiveawayEntries(name, amount);
+      if (!isAnonymous) {
+        addGiveawayEntries(name, amount);
+      }
     }
 
     if (processedAny) saveState();
