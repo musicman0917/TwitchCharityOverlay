@@ -65,6 +65,7 @@ The server reads optional environment variables (all have sensible defaults exce
 | `POLL_INTERVAL_MS`    | `15000`                  | How often to poll the Extra Life API (ms)            |
 | `NOM_ALERTS_BASE_URL` | `http://localhost:3010`  | Base URL of the `nom-token-broker` server, used for theme sync (see below) |
 | `ADMIN_PASSWORD`      | *(none)*                 | Password for the admin portal (`/admin.html`) — logins are rejected until this is set |
+| `DISCORD_WEBHOOK_URL` | *(none)*                 | Discord webhook for donation announcements (see below) — leave unset to disable |
 | `STARTING_HOURS`      | `4`                      | Base countdown duration in hours — only applies on the very first-ever boot (no `.overlay-state.json` yet); change it later via the admin portal instead (see below) |
 | `DONATION_REMINDER_INTERVAL_MS` | `900000` (15 min) | How often the recurring donation-link chat reminder repeats while the timer is running (see "Chat announcements" below) |
 
@@ -290,6 +291,27 @@ silent instead of repeating into an empty chat — regardless of whether the don
 itself is paused or running. Going live restarts the interval from zero, so the first reminder
 lands a full interval after stream start, not immediately. The admin portal's Status panel
 shows the current `Stream: LIVE`/`Offline` state live, same as it does for the theme.
+
+## Discord donation announcements
+
+Every real donation posts a rich embed to a Discord webhook, if `DISCORD_WEBHOOK_URL` is set
+(see Configuration above) — this is entirely optional, and the overlay works exactly the same
+without it. Unlike the NOM Alerts integrations above, this one needs its own secret: a Discord
+webhook URL is a bearer credential (anyone who has it can post to that channel), so it's set
+via `.env` and never committed, exactly like `ADMIN_PASSWORD`.
+
+The embed escalates with the donation's tier (the same tiers already configured in
+`public/donation-tiers.json` for the on-overlay alert — no separate configuration):
+
+- **Tier 1** (small): `🎉 New Donation!`, gold
+- **Tier 2** (medium): `🔥 Awesome Donation!`, orange
+- **Tier 3** (large): `🌟 INCREDIBLE Donation!`, orange-red
+
+Each embed includes the donor name and amount, a clickable title linking to the Extra Life
+donation page, current total raised (amount + percent of goal), and how much time that
+donation added to the timer. Only real donations trigger this — same baseline/test-alert
+exclusions as the chat announcements above. A webhook failure (deleted webhook, Discord
+outage, etc.) is logged and otherwise ignored, never affects the timer or donation processing.
 
 ## Donation milestones
 

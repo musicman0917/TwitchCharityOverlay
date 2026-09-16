@@ -50,6 +50,18 @@ if (!ADMIN_PASSWORD) {
   );
 }
 
+// Discord donation announcements — optional. Posts a rich embed to this
+// webhook for every real donation. Treated as a secret exactly like
+// ADMIN_PASSWORD: set via .env, never committed (this repo is public).
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || '';
+if (!DISCORD_WEBHOOK_URL) {
+  console.warn('[discord] DISCORD_WEBHOOK_URL is not set — donation announcements to Discord are disabled.');
+}
+const discordClient = axios.create({
+  timeout: 8000,
+  headers: { 'User-Agent': 'TwitchCharityOverlay/1.0 (OBS Donothon Timer)' },
+});
+
 const PARTICIPANT_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}`;
 const DONATIONS_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}/donations`;
 const INCENTIVES_URL = `https://extra-life.org/api/participants/${PARTICIPANT_ID}/incentives`;
@@ -397,6 +409,66 @@ async function postChatAnnouncement(message) {
   }
 }
 
+// Escalating look for the Discord embed, keyed by donation-tier id (same
+// tiers already configured for the on-overlay alert in donation-tiers.json)
+// -- bigger donations get a more dramatic title/color, same spirit as the
+// overlay's own tier escalation.
+const DISCORD_TIER_STYLE = {
+  tier1: { title: '🎉 New Donation!', color: 0xffd700 },
+  tier2: { title: '🔥 Awesome Donation!', color: 0xffa500 },
+  tier3: { title: '🌟 INCREDIBLE Donation!', color: 0xff4500 },
+};
+const DEFAULT_DISCORD_TIER_STYLE = { title: '🎉 New Donation!', color: 0xffd700 };
+
+function getDonationTierForAmount(amount) {
+  const tiers = loadDonationTiers()
+    .filter((t) => typeof t.minAmount === 'number')
+    .sort((a, b) => a.minAmount - b.minAmount);
+  let match = tiers[0] || null;
+  for (const tier of tiers) {
+    if (amount >= tier.minAmount) match = tier;
+  }
+  return match;
+}
+
+// Posts a rich embed to Discord for a real donation. Best-effort, same as
+// postChatAnnouncement -- a failure (webhook deleted, Discord down, etc.)
+// is logged and otherwise ignored, never affects timer/donation processing.
+async function postDiscordDonation(name, amount, secondsAdded) {
+  if (!DISCORD_WEBHOOK_URL) return;
+
+  const tier = getDonationTierForAmount(amount);
+  const style = (tier && DISCORD_TIER_STYLE[tier.id]) || DEFAULT_DISCORD_TIER_STYLE;
+  const pct = state.goal > 0 ? Math.min(100, (state.totalRaised / state.goal) * 100) : 0;
+  const minutesAdded = Math.round(secondsAdded / 60);
+
+  const embed = {
+    title: style.title,
+    url: DONATION_LINK_URL,
+    description: `**${name}** donated **${formatMoneyForChat(amount)}** to help kids at Dayton Children's Hospital! 💛`,
+    color: style.color,
+    fields: [
+      {
+        name: 'Total Raised',
+        value: `${formatMoneyForChat(state.totalRaised)} / ${formatMoneyForChat(state.goal)} (${pct.toFixed(1)}%)`,
+        inline: true,
+      },
+      { name: 'Time Added', value: `+${minutesAdded} min`, inline: true },
+    ],
+    footer: { text: 'A Quest For The Kids · Extra Life' },
+    timestamp: new Date().toISOString(),
+  };
+
+  try {
+    await discordClient.post(DISCORD_WEBHOOK_URL, {
+      username: 'Donothon Alerts',
+      embeds: [embed],
+    });
+  } catch (err) {
+    console.warn(`[discord] failed to post donation embed: ${err.message}`);
+  }
+}
+
 // Checks totalRaised against the configured milestones and fires alerts for
 // any newly-crossed ones. On the very first check (server just started, and
 // totalRaised may already be well past some milestones from before the
@@ -527,6 +599,7 @@ async function pollDonations() {
       io.emit('newDonation', { name, amount });
       io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
       postChatAnnouncement(`🎉 ${formatMoneyForChat(amount)} donation from ${name}! Thank you!`);
+      postDiscordDonation(name, amount, secondsToAdd);
     }
 
     if (processedAny) saveState();
