@@ -18,6 +18,9 @@ const GOAL_AMOUNT = Number(process.env.GOAL_AMOUNT || 1000);
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 15000);
 const DONATION_LINK_URL = `https://dd.extra-life.org/participants/${PARTICIPANT_ID}`;
 const DONATION_REMINDER_INTERVAL_MS = Number(process.env.DONATION_REMINDER_INTERVAL_MS || 15 * 60 * 1000);
+const DISCORD_MIN_DONATION_AMOUNT = 1; // Discord embed only posts for donations >= this
+const GIVEAWAY_MIN_DONATION_AMOUNT = 5; // a single donation must be at least this to earn any entries
+const GIVEAWAY_ENTRY_AMOUNT = 5; // one entry per this many dollars (e.g. $10 donation = 2 entries)
 // Default base timer duration, in hours -- how long the countdown starts at
 // before any donations add time. Not final until the base is confirmed;
 // change STARTING_HOURS any time before the first-ever boot, or adjust the
@@ -296,6 +299,13 @@ const state = {
   // and back off afterward. The event list itself (zooEvents) lives outside
   // of state, in zoo-events.json, same as donation-tiers/asset-images.
   zooEventsActive: persisted.zooEventsActive ?? false,
+  // End-of-campaign giveaway entries: { [donorName]: entryCount }. A single
+  // donation must be >= GIVEAWAY_MIN_DONATION_AMOUNT to earn any entries at
+  // all, then earns floor(amount / GIVEAWAY_ENTRY_AMOUNT) entries, added to
+  // that donor's running total across every qualifying donation they make.
+  giveawayEntries: (persisted.giveawayEntries && typeof persisted.giveawayEntries === 'object')
+    ? persisted.giveawayEntries
+    : {},
 };
 
 function saveState() {
@@ -314,6 +324,7 @@ function saveState() {
     bonusTimeActive: state.bonusTimeActive,
     milestones: state.milestones,
     zooEventsActive: state.zooEventsActive,
+    giveawayEntries: state.giveawayEntries,
   };
   fs.writeFileSync(STATE_FILE, JSON.stringify(snapshot, null, 2));
 }
@@ -363,6 +374,7 @@ function serializeState() {
     incentives: state.incentives,
     zooEvents: zooEvents,
     zooEventsActive: state.zooEventsActive,
+    giveawayEntries: serializeGiveawayEntries(),
   };
 }
 
@@ -467,6 +479,40 @@ async function postDiscordDonation(name, amount, secondsAdded) {
   } catch (err) {
     console.warn(`[discord] failed to post donation embed: ${err.message}`);
   }
+}
+
+// End-of-campaign giveaway ($5+ donations, floor(amount/5) entries per
+// qualifying donation, added to that donor's running total). Purely a
+// bookkeeping side-effect of a real donation -- never touches the timer,
+// never fires from Test Alerts.
+function addGiveawayEntries(name, amount) {
+  if (amount < GIVEAWAY_MIN_DONATION_AMOUNT) return;
+  const entries = Math.floor(amount / GIVEAWAY_ENTRY_AMOUNT);
+  if (entries <= 0) return;
+  state.giveawayEntries[name] = (state.giveawayEntries[name] || 0) + entries;
+  io.emit('giveawayUpdate', { giveawayEntries: serializeGiveawayEntries() });
+}
+
+function serializeGiveawayEntries() {
+  return Object.entries(state.giveawayEntries)
+    .map(([name, entries]) => ({ name, entries }))
+    .sort((a, b) => b.entries - a.entries);
+}
+
+// Weighted random draw -- each entrant's odds are proportional to their
+// entry count. Non-destructive: picking a winner doesn't remove them from
+// the pool, so re-drawing (or excluding a past winner) is a manual choice.
+function drawGiveawayWinner() {
+  const entrants = serializeGiveawayEntries();
+  const totalEntries = entrants.reduce((sum, e) => sum + e.entries, 0);
+  if (totalEntries <= 0) return null;
+
+  let roll = Math.random() * totalEntries;
+  for (const entrant of entrants) {
+    roll -= entrant.entries;
+    if (roll < 0) return { ...entrant, totalEntries };
+  }
+  return { ...entrants[entrants.length - 1], totalEntries }; // float-rounding fallback
 }
 
 // Checks totalRaised against the configured milestones and fires alerts for
@@ -599,7 +645,10 @@ async function pollDonations() {
       io.emit('newDonation', { name, amount });
       io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
       postChatAnnouncement(`🎉 ${formatMoneyForChat(amount)} donation from ${name}! Thank you!`);
-      postDiscordDonation(name, amount, secondsToAdd);
+      if (amount >= DISCORD_MIN_DONATION_AMOUNT) {
+        postDiscordDonation(name, amount, secondsToAdd);
+      }
+      addGiveawayEntries(name, amount);
     }
 
     if (processedAny) saveState();
@@ -936,6 +985,16 @@ app.post('/admin/zoo-events/toggle', requireAdminAuth, (req, res) => {
   io.emit('zooEventsUpdate', { zooEvents, zooEventsActive: state.zooEventsActive });
   saveState();
   res.json({ ok: true, zooEventsActive: state.zooEventsActive });
+});
+
+// -- Giveaway ($5+ donations) --
+app.post('/admin/giveaway/draw', requireAdminAuth, (req, res) => {
+  const winner = drawGiveawayWinner();
+  if (!winner) {
+    return res.status(400).json({ error: 'No giveaway entrants yet' });
+  }
+  console.log(`[giveaway] drawn: ${winner.name} (${winner.entries}/${winner.totalEntries} entries)`);
+  res.json({ ok: true, winner });
 });
 
 // -- Test alerts — visual/audio preview only, never touches real state --

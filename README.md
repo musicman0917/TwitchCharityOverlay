@@ -309,9 +309,23 @@ The embed escalates with the donation's tier (the same tiers already configured 
 
 Each embed includes the donor name and amount, a clickable title linking to the Extra Life
 donation page, current total raised (amount + percent of goal), and how much time that
-donation added to the timer. Only real donations trigger this — same baseline/test-alert
-exclusions as the chat announcements above. A webhook failure (deleted webhook, Discord
-outage, etc.) is logged and otherwise ignored, never affects the timer or donation processing.
+donation added to the timer. Only donations of **$1 or more** trigger this, and only real
+donations — same baseline/test-alert exclusions as the chat announcements above. A webhook
+failure (deleted webhook, Discord outage, etc.) is logged and otherwise ignored, never affects
+the timer or donation processing.
+
+## End-of-campaign giveaway
+
+Every donation of **$5 or more** earns entries in a giveaway pool — 1 entry per $5 (a $12
+donation earns 2 entries), added to that donor's running total across every qualifying
+donation they make over the whole campaign (donate $5 today and $10 next week, and you've got
+3 entries combined). Donations under $5 don't qualify at all, even if you've donated before.
+
+The admin portal's **Giveaway** panel shows the live entry pool (name + entry count, most
+entries first) and a **🎲 Draw Winner** button — a weighted random pick, so someone with 3
+entries is 3x as likely to win as someone with 1. Drawing a winner doesn't remove them from the
+pool, so it's always safe to draw again. Entries persist across restarts in
+`.overlay-state.json`, same as the timer and total raised.
 
 ## Donation milestones
 

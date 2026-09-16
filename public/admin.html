@@ -398,6 +398,22 @@
     </div>
 
     <div class="panel">
+      <h2>Giveaway ($5+ Donations)</h2>
+      <p class="subtitle" style="margin-bottom: 12px;">
+        Every donation of $5 or more earns 1 entry per $5 (e.g. a $12 donation = 2 entries),
+        added to that donor's running total across every qualifying donation they make over the
+        whole campaign. Meant for one end-of-campaign drawing — picking a winner doesn't remove
+        them from the pool, so re-drawing is always safe.
+      </p>
+      <div class="status-line">Total entries in pool: <strong id="giveaway-total-entries">0</strong></div>
+      <div id="giveaway-rows" class="incentive-list" style="margin: 10px 0;"></div>
+      <div class="row">
+        <div style="flex: 0 0 auto;"><button id="giveaway-draw-btn">🎲 Draw Winner</button></div>
+      </div>
+      <div class="msg" id="giveaway-msg"></div>
+    </div>
+
+    <div class="panel">
       <h2>Test Alerts</h2>
       <p class="subtitle" style="margin-bottom: 12px;">Fires the visual/sound alert only — never touches the real timer, total, or "Latest Hero" display.</p>
 
@@ -673,6 +689,7 @@
       renderMilestoneRows(state.milestones);
       renderZooEventsStatus(state.zooEventsActive);
       renderZooEventRows(state.zooEvents);
+      renderGiveawayRows(state.giveawayEntries);
       const pill = document.getElementById('status-pill');
       if (state.timerPaused) {
         pill.textContent = 'PAUSED';
@@ -737,6 +754,9 @@
     socket.on('zooEventsUpdate', (data) => {
       renderZooEventsStatus(data.zooEventsActive);
       renderZooEventRows(data.zooEvents);
+    });
+    socket.on('giveawayUpdate', (data) => {
+      renderGiveawayRows(data.giveawayEntries);
     });
 
     // -- Timer controls --
@@ -921,6 +941,21 @@
       }
     });
 
+    document.getElementById('giveaway-draw-btn').addEventListener('click', async () => {
+      const msgEl = document.getElementById('giveaway-msg');
+      const res = await apiFetch('/admin/giveaway/draw', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        const w = data.winner;
+        msgEl.textContent = `🎉 Winner: ${w.name} (${w.entries}/${w.totalEntries} entries — won with ${((w.entries / w.totalEntries) * 100).toFixed(1)}% odds)`;
+        msgEl.className = 'msg ok';
+      } else {
+        const data = await res.json().catch(() => ({}));
+        msgEl.textContent = data.error || 'Failed to draw a winner.';
+        msgEl.className = 'msg err';
+      }
+    });
+
     // -- Test alerts --
     document.getElementById('test-donation-btn').addEventListener('click', async () => {
       const name = document.getElementById('test-donor-name').value || 'TestDonor';
@@ -994,6 +1029,39 @@
           item.appendChild(meta);
         }
 
+        container.appendChild(item);
+      }
+    }
+
+    function renderGiveawayRows(giveawayEntries) {
+      const container = document.getElementById('giveaway-rows');
+      container.innerHTML = '';
+      const list = Array.isArray(giveawayEntries) ? giveawayEntries : [];
+      const total = list.reduce((sum, e) => sum + e.entries, 0);
+      document.getElementById('giveaway-total-entries').textContent = total;
+
+      if (list.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'tier-empty';
+        empty.textContent = 'No giveaway entrants yet — donations of $5+ earn entries automatically.';
+        container.appendChild(empty);
+        return;
+      }
+
+      for (const e of list) {
+        const item = document.createElement('div');
+        item.className = 'incentive-item';
+
+        const entries = document.createElement('span');
+        entries.className = 'incentive-amount';
+        entries.textContent = `${e.entries}×`;
+
+        const name = document.createElement('span');
+        name.className = 'incentive-desc';
+        name.textContent = e.name;
+
+        item.appendChild(entries);
+        item.appendChild(name);
         container.appendChild(item);
       }
     }
