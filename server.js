@@ -36,6 +36,7 @@ const BONUS_TIME_SECONDS_PER_DOLLAR = 5 * 60; // +5 minutes per $1 donated while
 const NOM_ALERTS_BASE_URL = process.env.NOM_ALERTS_BASE_URL || 'http://localhost:3010';
 const NOM_ALERTS_SSE_URL = `${NOM_ALERTS_BASE_URL}/alerts-stream`;
 const NOM_ALERTS_THEME_STATE_URL = `${NOM_ALERTS_BASE_URL}/theme-state`;
+const NOM_ALERTS_STREAM_STATUS_URL = `${NOM_ALERTS_BASE_URL}/stream-status`;
 const NOM_ALERTS_CHAT_ANNOUNCE_URL = `${NOM_ALERTS_BASE_URL}/chat/announce`;
 const SSE_RECONNECT_DELAY_MS = 5000;
 
@@ -251,6 +252,11 @@ const state = {
   processedDonationIds: new Set(persisted.processedDonationIds || []),
   hasBaseline: persisted.hasBaseline ?? false, // becomes true after the first successful donations poll
   theme: 'tavern',
+  // Whether the Twitch stream is currently live, per NOM Alerts' EventSub
+  // subscriptions -- not persisted, always refreshed from nom-token-broker
+  // on boot (same reasoning as theme). Gates the recurring donation-link
+  // chat reminder (see below).
+  streamLive: false,
   reachedMilestones: new Set(persisted.reachedMilestones || []), // amounts already crossed
   milestonesChecked: persisted.milestonesChecked ?? false, // becomes true after the first milestone check
   // Fresh installs default to PAUSED -- the overlay is meant to sit up for
@@ -337,6 +343,7 @@ function serializeState() {
     latestDonorName: state.latestDonorName,
     latestDonorAmount: state.latestDonorAmount,
     theme: state.theme,
+    streamLive: state.streamLive,
     milestones: serializeMilestones(),
     timerPaused: state.timerPaused,
     scheduledStartAt: state.scheduledStartAt,
@@ -360,6 +367,14 @@ function setTheme(theme) {
   state.theme = theme;
   console.log(`[theme] switched to "${theme}"`);
   io.emit('themeUpdate', { theme: state.theme });
+}
+
+function setStreamLive(live) {
+  const next = !!live;
+  if (next === state.streamLive) return;
+  state.streamLive = next;
+  console.log(`[stream] now ${next ? 'LIVE' : 'offline'}`);
+  io.emit('streamStatusUpdate', { streamLive: state.streamLive });
 }
 
 function formatMoneyForChat(amount) {
@@ -579,26 +594,28 @@ function pollMilestones() {
 pollMilestones();
 setInterval(pollMilestones, DONOR_DRIVE_METADATA_POLL_INTERVAL_MS);
 
-// Periodic donation-link reminder in chat -- only while the timer is
-// actually running (not paused), so it doesn't spam an empty/offline chat
-// during the multi-week lead-up before a stream. Doesn't fire immediately
-// on boot; the first reminder lands one interval after startup (or after
-// the timer's next resume), same as it would mid-stream.
+// Periodic donation-link reminder in chat -- only while the Twitch stream
+// is actually live (per NOM Alerts' stream.online/offline tracking, not the
+// donothon timer's pause state), so it never fires into an empty/offline
+// chat. Doesn't fire immediately on boot/stream start; the first reminder
+// lands one interval after the stream goes live.
 setInterval(() => {
-  if (state.timerPaused) return;
+  if (!state.streamLive) return;
   postChatAnnouncement(
     `💝 Every dollar helps kids at Dayton Children's Hospital and adds time to the clock! Donate: ${DONATION_LINK_URL}`
   );
 }, DONATION_REMINDER_INTERVAL_MS);
 
 // ---------------------------------------------------------------------------
-// NOM Alerts theme sync — live via SSE from nom-token-broker's /alerts-stream,
-// with an initial fetch from /theme-state so we start on the right theme
-// instead of always booting into "tavern".
+// NOM Alerts sync — theme + stream live status, both live via SSE from
+// nom-token-broker's /alerts-stream, with initial fetches so we start
+// correct instead of defaulting to "tavern"/offline until the first event.
 //
 // Confirmed contract (captured directly from nom-token-broker):
-//   GET /theme-state  -> {"theme":"<name>"}
-//   SSE /alerts-stream -> data: {"type":"theme-switch","theme":"<name>"}
+//   GET /theme-state    -> {"theme":"<name>"}
+//   GET /stream-status  -> {"live": true|false}
+//   SSE /alerts-stream  -> data: {"type":"theme-switch","theme":"<name>"}
+//                       -> data: {"type":"stream-status","live":true|false}
 //   (no `event:` field — every message is a plain `data:` line with a
 //   `type` discriminator)
 // ---------------------------------------------------------------------------
@@ -612,6 +629,20 @@ async function fetchInitialTheme() {
   } catch (err) {
     console.warn(
       `[theme] could not fetch initial theme from NOM Alerts (${err.message}); defaulting to "${state.theme}"`
+    );
+  }
+}
+
+async function fetchInitialStreamStatus() {
+  try {
+    const { data } = await nomAlertsClient.get(NOM_ALERTS_STREAM_STATUS_URL);
+    if (data && typeof data.live === 'boolean') {
+      state.streamLive = data.live;
+      console.log(`[stream] initial status from NOM Alerts: ${state.streamLive ? 'LIVE' : 'offline'}`);
+    }
+  } catch (err) {
+    console.warn(
+      `[stream] could not fetch initial stream status from NOM Alerts (${err.message}); defaulting to offline`
     );
   }
 }
@@ -637,9 +668,12 @@ function handleSseMessage(raw) {
   if (payload.type === 'theme-switch') {
     setTheme(payload.theme);
   }
+  if (payload.type === 'stream-status') {
+    setStreamLive(payload.live);
+  }
 }
 
-function connectToAlertsThemeStream() {
+function connectToAlertsStream() {
   axios
     .get(NOM_ALERTS_SSE_URL, {
       responseType: 'stream',
@@ -647,7 +681,7 @@ function connectToAlertsThemeStream() {
       headers: { Accept: 'text/event-stream' },
     })
     .then((response) => {
-      console.log(`[theme] connected to NOM Alerts SSE stream at ${NOM_ALERTS_SSE_URL}`);
+      console.log(`[alerts-sse] connected to NOM Alerts SSE stream at ${NOM_ALERTS_SSE_URL}`);
       let buffer = '';
 
       response.data.on('data', (chunk) => {
@@ -658,24 +692,24 @@ function connectToAlertsThemeStream() {
       });
 
       response.data.on('end', () => {
-        console.warn('[theme] NOM Alerts SSE stream ended; reconnecting in 5s');
-        setTimeout(connectToAlertsThemeStream, SSE_RECONNECT_DELAY_MS);
+        console.warn('[alerts-sse] NOM Alerts SSE stream ended; reconnecting in 5s');
+        setTimeout(connectToAlertsStream, SSE_RECONNECT_DELAY_MS);
       });
 
       response.data.on('error', (err) => {
-        console.error(`[theme] NOM Alerts SSE stream error: ${err.message}; reconnecting in 5s`);
-        setTimeout(connectToAlertsThemeStream, SSE_RECONNECT_DELAY_MS);
+        console.error(`[alerts-sse] NOM Alerts SSE stream error: ${err.message}; reconnecting in 5s`);
+        setTimeout(connectToAlertsStream, SSE_RECONNECT_DELAY_MS);
       });
     })
     .catch((err) => {
       console.warn(
-        `[theme] could not connect to NOM Alerts SSE stream (${err.message}); retrying in 5s`
+        `[alerts-sse] could not connect to NOM Alerts SSE stream (${err.message}); retrying in 5s`
       );
-      setTimeout(connectToAlertsThemeStream, SSE_RECONNECT_DELAY_MS);
+      setTimeout(connectToAlertsStream, SSE_RECONNECT_DELAY_MS);
     });
 }
 
-fetchInitialTheme().then(connectToAlertsThemeStream);
+Promise.all([fetchInitialTheme(), fetchInitialStreamStatus()]).then(connectToAlertsStream);
 
 // ---------------------------------------------------------------------------
 // Admin portal API — timer controls, sound upload, test alerts, milestone

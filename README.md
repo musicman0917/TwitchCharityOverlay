@@ -276,10 +276,20 @@ There's also a recurring reminder, every `DONATION_REMINDER_INTERVAL_MS` (defaul
 > 💝 Every dollar helps kids at Dayton Children's Hospital and adds time to the clock! Donate:
 > https://dd.extra-life.org/participants/567118
 
-It only fires while the timer is actually running (`timerPaused` is `false`) — during the
-multi-week lead-up before a stream, or any time you pause for a break, it stays silent instead
-of repeating into an empty/offline chat. Resuming picks the interval back up from zero, so the
-first reminder after a resume lands a full interval later, not immediately.
+It only fires while the Twitch stream is actually live — not while the donothon timer is
+running. Live status comes from NOM Alerts via the same SSE connection as theme sync
+(`nom-token-broker`'s `stream.online`/`stream.offline` EventSub subscriptions), with an initial
+`GET /stream-status` fetch on boot so a restart mid-stream doesn't wait for the next status
+event to figure out it's live:
+
+- `GET /stream-status` → `{"live": true}` or `{"live": false}`
+- SSE `/alerts-stream` → `data: {"type":"stream-status","live":true}` on change
+
+During the multi-week lead-up before a stream, or any time the stream goes offline, this stays
+silent instead of repeating into an empty chat — regardless of whether the donothon timer
+itself is paused or running. Going live restarts the interval from zero, so the first reminder
+lands a full interval after stream start, not immediately. The admin portal's Status panel
+shows the current `Stream: LIVE`/`Offline` state live, same as it does for the theme.
 
 ## Donation milestones
 

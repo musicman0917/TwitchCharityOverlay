@@ -307,6 +307,7 @@
       <div class="status-line">Timer: <strong id="status-timer">--:--:--</strong> <span class="pill" id="status-pill">—</span></div>
       <div class="status-line">Total raised: <strong id="status-total">$0</strong></div>
       <div class="status-line">Theme: <strong id="status-theme">—</strong></div>
+      <div class="status-line">Stream: <strong id="status-stream">—</strong></div>
       <div class="status-line">Scheduled auto-resume: <strong id="status-schedule">None</strong></div>
       <div class="status-line">Base timer duration: <strong id="status-base">--:--:--</strong></div>
       <div class="status-line">Bonus time: <strong id="status-bonus-time">OFF</strong></div>
@@ -656,10 +657,15 @@
       }
     }
 
+    function renderStreamStatus(live) {
+      document.getElementById('status-stream').textContent = live ? 'LIVE' : 'Offline';
+    }
+
     function renderStatus(state) {
       document.getElementById('status-timer').textContent = formatTimer(state.currentTimer);
       document.getElementById('status-total').textContent = formatMoney(state.totalRaised);
       document.getElementById('status-theme').textContent = state.theme;
+      renderStreamStatus(state.streamLive);
       renderScheduleStatus(state.scheduledStartAt);
       renderBaseStatus(state.baseSeconds);
       renderBonusTimeStatus(state.bonusTimeActive);
@@ -705,6 +711,9 @@
     });
     socket.on('themeUpdate', (data) => {
       document.getElementById('status-theme').textContent = data.theme;
+    });
+    socket.on('streamStatusUpdate', (data) => {
+      renderStreamStatus(data.streamLive);
     });
     socket.on('baseUpdate', (data) => {
       renderBaseStatus(data.baseSeconds);
