@@ -265,6 +265,13 @@ already being set correctly.
 
 - Donation: `🎉 $50 donation from CoolViewer! Thank you!`
 - Milestone: `🏆 Milestone reached: $500 — Shave my head!`
+- Incentive redemption: `🎁 CoolViewer redeemed: Choose my Mario Kart character!` — fires
+  whenever a donation carries an `incentiveID` (a donor picked one of your Fundraiser
+  Incentives at donation time), matched against the same incentives list the admin portal's
+  Fundraiser Incentives panel already shows — so you see it in chat instead of only finding out
+  by checking the portal. If the incentive isn't found in that (5-minutes-stale-at-worst) cache
+  — e.g. it was just added to Extra Life — it still announces the redemption generically
+  instead of staying silent.
 
 Only *real* donations/milestones trigger this — the admin portal's Test Alerts never touch
 chat, and the startup baseline catch-up (donations/milestones that already existed before the

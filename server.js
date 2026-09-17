@@ -428,6 +428,22 @@ async function postChatAnnouncement(message) {
   }
 }
 
+// Announces which Fundraiser Incentive a donor picked, if any -- so it's
+// visible in chat instead of only showing up by checking the admin portal's
+// Fundraiser Incentives panel. state.incentives refreshes every 5 minutes
+// (see pollIncentives), so an incentive added to Extra Life and redeemed
+// within that same window falls back to a generic announcement instead of
+// silently saying nothing.
+function announceIncentiveRedemption(name, incentiveID) {
+  if (!incentiveID) return;
+  const incentive = state.incentives.find((i) => i.incentiveID === incentiveID);
+  if (incentive) {
+    postChatAnnouncement(`🎁 ${name} redeemed: ${incentive.description}`);
+  } else {
+    postChatAnnouncement(`🎁 ${name} redeemed an incentive! (check the admin portal for details)`);
+  }
+}
+
 // Escalating look for the Discord embed, keyed by donation-tier id (same
 // tiers already configured for the on-overlay alert in donation-tiers.json)
 // -- bigger donations get a more dramatic title/color, same spirit as the
@@ -655,6 +671,7 @@ async function pollDonations() {
       io.emit('newDonation', { name, amount });
       io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
       postChatAnnouncement(`🎉 ${formatMoneyForChat(amount)} donation from ${name}! Thank you!`);
+      announceIncentiveRedemption(name, donation.incentiveID);
       if (amount >= DISCORD_MIN_DONATION_AMOUNT) {
         postDiscordDonation(name, amount, secondsToAdd);
       }
