@@ -1,0 +1,112 @@
+/* ==========================================================================
+   Main overlay — vertical goal bar, matching the karaoke scene's design
+   (see karaoke.css) for a consistent look across scenes. Loaded after
+   style.css, which still supplies the default bottom quest-board bar
+   (timer + hero stay there) and everything else untouched.
+
+   Not folded into style.css directly: mobile.css only tweaks sizes on top
+   of style.css's horizontal goal-bar layout (it doesn't re-establish its
+   own), so changing the shared defaults to this rotated design would have
+   broken the mobile/vertical overlay. This file is scoped to index.html
+   only, same pattern as mobile.css/karaoke.css.
+   ========================================================================== */
+
+/* Leaves room on the right edge for the vertical bar instead of spanning
+   the full width -- hero-section (now the rightmost item in the bottom
+   bar) lands clear of it. */
+.quest-board {
+  right: 220px;
+}
+
+/* Extra Life's logo is pulled out of the top-right asset row and parked
+   beside the goal bar instead, alongside the amount/goal text -- same
+   treatment as the karaoke scene. QR code and Dayton Children's logo stay
+   in the default top-right spot. */
+#extra-life-logo-box {
+  position: fixed;
+  left: 1726px;
+  top: 190px;
+  width: 50px;
+  height: 50px;
+  padding: 4px;
+}
+
+#extra-life-logo-box span {
+  display: none;
+}
+
+/* Vertical thermometer-style goal bar on the far-right edge, in a widened
+   card holding a rotated text column next to it. Same "build horizontal at
+   a fixed size, center on a point, rotate -90deg" technique as the
+   karaoke scene: script.js only ever sets `.goal-bar-fill`'s inline
+   *width* (shared across all three overlays, untouched), so instead of
+   fighting that, the whole assembly is built horizontally and rotated as
+   one piece -- the fill rotates right along with it. Starts below the
+   asset-box row (top-right, ~32-162px) so the two don't collide. */
+.goal-section {
+  position: fixed;
+  right: 24px;
+  top: 180px;
+  width: 160px;
+  height: 780px;
+  max-width: none;
+  flex: none;
+  display: block;
+  padding: 12px 8px;
+}
+
+.goal-section #goal-text {
+  position: absolute;
+  top: 390px;
+  left: 33px;
+  width: 700px;
+  height: 36px;
+  margin-top: -18px;
+  margin-left: -350px;
+  transform: rotate(-90deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: unset;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+/* Milestone tick marks are positioned (left: pct%) for the horizontal
+   layout and don't translate to this rotated vertical one; simplest to
+   just hide them here rather than re-deriving their math. */
+.goal-section .goal-bar-markers {
+  display: none;
+}
+
+.goal-bar-wrap {
+  position: absolute;
+  top: 12px;
+  right: 8px;
+  width: 90px;
+  height: 756px;
+}
+
+.goal-section .goal-bar-track {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 756px;
+  height: 60px;
+  margin-top: -30px;
+  margin-left: -378px;
+  transform: rotate(-90deg);
+  border-radius: 10px;
+}
+
+/* The site-wide "minimized" state (quest board shrinks while the timer is
+   paused) thins the horizontal bars via a selector more specific than the
+   rule above -- pin the height back so this bar doesn't collapse to a
+   sliver whenever the timer is paused. */
+.quest-board.minimized .goal-section .goal-bar-track {
+  height: 60px;
+  border-radius: 10px;
+}
