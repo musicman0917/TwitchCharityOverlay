@@ -18,24 +18,31 @@ html, body {
 }
 
 /* --------------------------------------------------------------------------
-   Asset boxes — left column, stacked vertically below the webcam, instead
-   of the top-right row used on the main overlay.
+   Asset boxes — QR code and Dayton Children's logo stay at the same
+   top-right spot the main overlay uses (no override needed, style.css's
+   default already puts them there). Extra Life's logo is pulled out of
+   that row instead and parked beside the goal bar below (see
+   "Side label" section) alongside the amount/goal text.
    -------------------------------------------------------------------------- */
-.asset-corner {
-  top: 440px;
-  left: 24px;
-  right: auto;
-  bottom: auto;
-  flex-direction: column;
-  gap: 16px;
+#extra-life-logo-box {
+  position: fixed;
+  left: 1726px;
+  top: 190px;
+  width: 50px;
+  height: 50px;
+  padding: 4px;
+}
+
+#extra-life-logo-box span {
+  display: none;
 }
 
 /* --------------------------------------------------------------------------
    Quest board — no longer one cohesive bottom bar for this scene. Each
-   piece is independently fixed-positioned: timer stacks above the asset
-   boxes in the left column, the goal bar moves to a bottom band under the
-   karaoke widget, and "Latest Hero" is hidden (no open space for a third
-   panel, and the info already shows up via chat/Discord anyway).
+   piece is independently fixed-positioned: timer stacks in the left
+   column, the goal bar is a vertical thermometer on the far-right edge,
+   and "Latest Hero" is hidden (no open space for a third panel, and the
+   info already shows up via chat/Discord anyway).
    -------------------------------------------------------------------------- */
 .quest-board {
   position: static;
@@ -61,32 +68,46 @@ html, body {
    on the other two overlays, untouched), so instead of fighting that, the
    whole track is built horizontally at a fixed pixel size, centered, and
    then rotated -90deg -- the rotated bounding box exactly fills the
-   vertical wrap below, and the fill/markers rotate along with it for free. */
+   vertical wrap below, and the fill/markers rotate along with it for free.
+   Starts below the asset-box row (top-right, ~32-162px) so the two don't
+   collide. */
 .goal-section {
   position: fixed;
   right: 24px;
-  top: 140px;
+  top: 180px;
   width: 110px;
-  height: 820px;
+  height: 780px;
   max-width: none;
   flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  display: block;
   padding: 12px 6px;
-  text-align: center;
 }
 
+/* The dollar/goal text doesn't fit readably at this column's ~90px width
+   no matter the font size -- 5 cramped wrapped lines looked bad. Instead
+   it's a single-line label, rotated to run vertically in the side-label
+   column (lots of length to work with there) next to the Extra Life logo,
+   rather than overlaid on the bar itself. */
 .goal-section #goal-text {
-  font-size: 12px;
-  line-height: 1.3;
-  height: 60px;
+  position: fixed;
+  left: 1736px;
+  top: 270px;
+  width: 680px;
+  height: 34px;
+  transform-origin: top left;
+  transform: rotate(-90deg) translateX(-100%);
   display: flex;
   align-items: center;
-  white-space: normal;
+  justify-content: center;
+  white-space: nowrap;
   overflow: visible;
   text-overflow: unset;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  z-index: 2;
+  color: var(--gold-bright);
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9), 0 0 6px rgba(0, 0, 0, 0.9);
 }
 
 /* Milestone tick marks are positioned (left: pct%) for the horizontal bars
@@ -99,17 +120,18 @@ html, body {
 .goal-bar-wrap {
   position: relative;
   width: 90px;
-  height: 724px;
+  height: 756px;
+  margin: 0 auto;
 }
 
 .goal-section .goal-bar-track {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 724px;
+  width: 756px;
   height: 60px;
   margin-top: -30px;
-  margin-left: -362px;
+  margin-left: -378px;
   transform: rotate(-90deg);
   border-radius: 10px;
 }
