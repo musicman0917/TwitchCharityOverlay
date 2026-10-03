@@ -148,6 +148,27 @@ theme, and asset images), just re-laid-out: the Timer/Goal/Latest Hero panels st
 vertically instead of sitting side by side. Add it as a Browser Source the same way, but
 set width `1080` and height `1920`.
 
+## Karaoke scene overlay
+
+`http://localhost:3011/karaoke.html` is a third overlay page for the karaoke-party scene,
+where the on-screen webcam/chat/song-activity widgets leave much less open space than a
+typical gameplay scene. Same backend/`script.js` as the other two, just re-laid-out again:
+
+- QR code / Extra Life / Dayton Children's logos stack vertically in a left-side column below
+  the webcam (instead of the top-right row the main overlay uses)
+- The donothon timer sits above that same column
+- The goal bar moves to a band along the very bottom, under the chat/activity widget
+- "Latest Hero" is hidden entirely — no open space for a third panel, and the info already
+  shows up via Twitch chat/Discord announcements
+
+The exact positions were measured off a reference screenshot of the karaoke scene with its
+own sources hidden, not pulled from OBS directly — nudge the numbers in `public/karaoke.css`
+if anything clips against the real scene. The donation alert popup, milestone alerts, and the
+"Next Milestone"/"Next At The Zoo" callouts are intentionally left at their default (main
+overlay) positions — they're transient (a few seconds at a time), and there wasn't a spot to
+move them to that wouldn't just trade one brief overlap for another, since the chat/activity
+widget occupies most of the screen.
+
 ## Clip-friendly layout
 
 The bottom bar is deliberately **three separate panels** (Timer, Goal, Latest Hero) with real

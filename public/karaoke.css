@@ -1,0 +1,75 @@
+/* ==========================================================================
+   Karaoke scene layout overrides — loaded after style.css, which still
+   supplies the theme color variables (:root / :root[data-theme='disney'])
+   and most component styling untouched. This file only repositions things
+   to fit the open space left by the karaoke scene's own OBS sources:
+   webcam top-left (~0-410px wide, ~0-265px tall) and a chat/song-queue/
+   activity widget filling the rest (~410-1920px, ~84-961px).
+
+   That leaves an L-shaped free area: a tall column on the left below the
+   webcam, plus a thin band across the very bottom. Measured off a reference
+   screenshot with the karaoke sources hidden -- not pixel-perfect, so nudge
+   the numbers below if anything still clips against the real OBS scene.
+   ========================================================================== */
+
+html, body {
+  width: 1920px;
+  height: 1080px;
+}
+
+/* --------------------------------------------------------------------------
+   Asset boxes — left column, stacked vertically below the webcam, instead
+   of the top-right row used on the main overlay.
+   -------------------------------------------------------------------------- */
+.asset-corner {
+  top: 440px;
+  left: 24px;
+  right: auto;
+  bottom: auto;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --------------------------------------------------------------------------
+   Quest board — no longer one cohesive bottom bar for this scene. Each
+   piece is independently fixed-positioned: timer stacks above the asset
+   boxes in the left column, the goal bar moves to a bottom band under the
+   karaoke widget, and "Latest Hero" is hidden (no open space for a third
+   panel, and the info already shows up via chat/Discord anyway).
+   -------------------------------------------------------------------------- */
+.quest-board {
+  position: static;
+  display: block;
+}
+
+.timer-section {
+  position: fixed;
+  left: 24px;
+  top: 290px;
+  width: 360px;
+  flex: none;
+  min-width: 0;
+}
+
+.hero-section {
+  display: none;
+}
+
+.goal-section {
+  position: fixed;
+  left: 410px;
+  right: 24px;
+  bottom: 24px;
+  max-width: none;
+  flex: none;
+  padding: 10px 24px;
+}
+
+.goal-section #goal-text {
+  font-size: 16px;
+}
+
+.goal-section .goal-bar-track {
+  height: 20px;
+  border-radius: 10px;
+}
