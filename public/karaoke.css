@@ -63,39 +63,43 @@ html, body {
 }
 
 /* Vertical thermometer-style bar hugging the far-right edge, past the
-   karaoke widget's trophy/"Choose Activity" panel. script.js only ever
-   sets `.goal-bar-fill`'s inline *width* (shared with the horizontal bars
-   on the other two overlays, untouched), so instead of fighting that, the
-   whole track is built horizontally at a fixed pixel size, centered, and
-   then rotated -90deg -- the rotated bounding box exactly fills the
-   vertical wrap below, and the fill/markers rotate along with it for free.
+   karaoke widget's trophy/"Choose Activity" panel, inside a widened
+   .quest-panel card so there's room for a proper beige-background text
+   column next to it (not floating over the black canvas outside the
+   card). script.js only ever sets `.goal-bar-fill`'s inline *width*
+   (shared with the horizontal bars on the other two overlays, untouched),
+   so instead of fighting that, the whole track is built horizontally at a
+   fixed pixel size, centered in its own column, and rotated -90deg -- the
+   rotated bounding box exactly fills the column, fill/markers included.
    Starts below the asset-box row (top-right, ~32-162px) so the two don't
    collide. */
 .goal-section {
   position: fixed;
   right: 24px;
   top: 180px;
-  width: 110px;
+  width: 160px;
   height: 780px;
   max-width: none;
   flex: none;
   display: block;
-  padding: 12px 6px;
+  padding: 12px 8px;
 }
 
-/* The dollar/goal text doesn't fit readably at this column's ~90px width
-   no matter the font size -- 5 cramped wrapped lines looked bad. Instead
-   it's a single-line label, rotated to run vertically in the side-label
-   column (lots of length to work with there) next to the Extra Life logo,
-   rather than overlaid on the bar itself. */
+/* The dollar/goal text doesn't fit readably at this column's width no
+   matter the font size -- 5 cramped wrapped lines looked bad. Instead
+   it's a single-line label, rotated to run the length of a column of its
+   own on the card's beige background, right next to the bar, using the
+   same "build horizontal at a fixed size, center on a point, rotate"
+   technique as the bar's track below. */
 .goal-section #goal-text {
-  position: fixed;
-  left: 1765px;
-  top: 270px;
-  width: 680px;
-  height: 34px;
-  transform-origin: top left;
-  transform: rotate(-90deg) translateX(-100%);
+  position: absolute;
+  top: 390px;
+  left: 33px;
+  width: 700px;
+  height: 36px;
+  margin-top: -18px;
+  margin-left: -350px;
+  transform: rotate(-90deg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -105,9 +109,6 @@ html, body {
   font-size: 18px;
   letter-spacing: 0.02em;
   text-transform: none;
-  z-index: 2;
-  color: var(--gold-bright);
-  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9), 0 0 6px rgba(0, 0, 0, 0.9);
 }
 
 /* Milestone tick marks are positioned (left: pct%) for the horizontal bars
@@ -118,10 +119,11 @@ html, body {
 }
 
 .goal-bar-wrap {
-  position: relative;
+  position: absolute;
+  top: 12px;
+  right: 8px;
   width: 90px;
   height: 756px;
-  margin: 0 auto;
 }
 
 .goal-section .goal-bar-track {
