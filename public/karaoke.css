@@ -55,21 +55,70 @@ html, body {
   display: none;
 }
 
+/* Vertical thermometer-style bar hugging the far-right edge, past the
+   karaoke widget's trophy/"Choose Activity" panel. script.js only ever
+   sets `.goal-bar-fill`'s inline *width* (shared with the horizontal bars
+   on the other two overlays, untouched), so instead of fighting that, the
+   whole track is built horizontally at a fixed pixel size, centered, and
+   then rotated -90deg -- the rotated bounding box exactly fills the
+   vertical wrap below, and the fill/markers rotate along with it for free. */
 .goal-section {
   position: fixed;
-  left: 410px;
   right: 24px;
-  bottom: 24px;
+  top: 140px;
+  width: 110px;
+  height: 820px;
   max-width: none;
   flex: none;
-  padding: 10px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 6px;
+  text-align: center;
 }
 
 .goal-section #goal-text {
-  font-size: 16px;
+  font-size: 12px;
+  line-height: 1.3;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+/* Milestone tick marks are positioned (left: pct%) for the horizontal bars
+   on the other overlays and don't translate to this rotated vertical one;
+   simplest to just hide them here rather than re-deriving their math. */
+.goal-section .goal-bar-markers {
+  display: none;
+}
+
+.goal-bar-wrap {
+  position: relative;
+  width: 90px;
+  height: 724px;
 }
 
 .goal-section .goal-bar-track {
-  height: 20px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 724px;
+  height: 60px;
+  margin-top: -30px;
+  margin-left: -362px;
+  transform: rotate(-90deg);
+  border-radius: 10px;
+}
+
+/* The site-wide "minimized" state (quest board shrinks while the timer is
+   paused) thins the horizontal bars on the other overlays via a selector
+   more specific than the rule above -- pin the height back so this bar
+   doesn't collapse to a sliver whenever the timer is paused. */
+.quest-board.minimized .goal-section .goal-bar-track {
+  height: 60px;
   border-radius: 10px;
 }
