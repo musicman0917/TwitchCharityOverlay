@@ -47,7 +47,7 @@
   position: fixed;
   right: 24px;
   top: 180px;
-  width: 160px;
+  width: 136px;
   height: 780px;
   max-width: none;
   flex: none;
@@ -58,10 +58,10 @@
 .goal-section #goal-text {
   position: absolute;
   top: 390px;
-  left: 33px;
+  left: 17px;
   width: 700px;
-  height: 36px;
-  margin-top: -18px;
+  height: 26px;
+  margin-top: -13px;
   margin-left: -350px;
   transform: rotate(-90deg);
   display: flex;
