@@ -24,9 +24,17 @@ const GIVEAWAY_ENTRY_AMOUNT = 5; // one entry per this many dollars (e.g. $10 do
 // Names excluded from the giveaway regardless of amount (case-insensitive) --
 // e.g. the streamer's own name, so a self-donation or a donation processed
 // under the channel's own display name can't win its own giveaway.
+// Strips everything but letters/digits before lowercasing, so "Neighborhood
+// Of Music", "NeighborhoodOfMusic", and "neighborhood-of-music" all match
+// the same excluded entry regardless of spacing/punctuation a donor (or the
+// streamer's own display name) happens to use.
+function normalizeNameForMatch(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 const GIVEAWAY_EXCLUDED_NAMES = (process.env.GIVEAWAY_EXCLUDED_NAMES || 'neighborhoodofmusic')
   .split(',')
-  .map((n) => n.trim().toLowerCase())
+  .map((n) => normalizeNameForMatch(n))
   .filter(Boolean);
 // Default base timer duration, in hours -- how long the countdown starts at
 // before any donations add time. Not final until the base is confirmed;
@@ -512,7 +520,7 @@ async function postDiscordDonation(name, amount, secondsAdded) {
 // names in GIVEAWAY_EXCLUDED_NAMES (e.g. the streamer's own channel name)
 // are rejected here directly.
 function addGiveawayEntries(name, amount) {
-  if (GIVEAWAY_EXCLUDED_NAMES.includes(name.trim().toLowerCase())) return;
+  if (GIVEAWAY_EXCLUDED_NAMES.includes(normalizeNameForMatch(name))) return;
   if (amount < GIVEAWAY_MIN_DONATION_AMOUNT) return;
   const entries = Math.floor(amount / GIVEAWAY_ENTRY_AMOUNT);
   if (entries <= 0) return;
@@ -1024,6 +1032,20 @@ app.post('/admin/giveaway/draw', requireAdminAuth, (req, res) => {
   }
   console.log(`[giveaway] drawn: ${winner.name} (${winner.entries}/${winner.totalEntries} entries)`);
   res.json({ ok: true, winner });
+});
+
+// Manual cleanup for an entrant that shouldn't be in the pool -- e.g. a
+// name that slipped past GIVEAWAY_EXCLUDED_NAMES before this match got
+// normalized, or any other entry that needs correcting by hand.
+app.post('/admin/giveaway/remove', requireAdminAuth, (req, res) => {
+  const name = req.body && req.body.name;
+  if (!name || !Object.prototype.hasOwnProperty.call(state.giveawayEntries, name)) {
+    return res.status(400).json({ error: 'Unknown entrant' });
+  }
+  delete state.giveawayEntries[name];
+  saveState();
+  io.emit('giveawayUpdate', { giveawayEntries: serializeGiveawayEntries() });
+  res.json({ ok: true, giveawayEntries: serializeGiveawayEntries() });
 });
 
 // -- Test alerts — visual/audio preview only, never touches real state --

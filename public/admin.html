@@ -1060,8 +1060,30 @@
         name.className = 'incentive-desc';
         name.textContent = e.name;
 
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'danger';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', async () => {
+          const msgEl = document.getElementById('giveaway-msg');
+          const res = await apiFetch('/admin/giveaway/remove', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: e.name }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            renderGiveawayRows(data.giveawayEntries);
+            msgEl.textContent = `Removed "${e.name}" from the giveaway pool.`;
+            msgEl.className = 'msg ok';
+          } else {
+            msgEl.textContent = `Failed to remove "${e.name}".`;
+            msgEl.className = 'msg err';
+          }
+        });
+
         item.appendChild(entries);
         item.appendChild(name);
+        item.appendChild(removeBtn);
         container.appendChild(item);
       }
     }
