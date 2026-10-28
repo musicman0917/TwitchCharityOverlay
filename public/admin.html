@@ -311,6 +311,7 @@
       <div class="status-line">Scheduled auto-resume: <strong id="status-schedule">None</strong></div>
       <div class="status-line">Base timer duration: <strong id="status-base">--:--:--</strong></div>
       <div class="status-line">Bonus time: <strong id="status-bonus-time">OFF</strong></div>
+      <div class="status-line">Time additions: <strong id="status-time-additions">ON</strong></div>
       <div class="status-line">Zoo events: <strong id="status-zoo-events">OFF</strong></div>
     </div>
 
@@ -374,6 +375,17 @@
         remember to turn it back off afterward.
       </p>
       <div class="msg" id="bonus-time-msg"></div>
+
+      <div class="row" style="margin-top: 16px; border-top: 1px solid var(--panel-border); padding-top: 14px;">
+        <div><button id="time-additions-btn">Disable Time Additions</button></div>
+      </div>
+      <p class="subtitle" style="margin: 0;">
+        Stops donations from adding time to the countdown at all -- separate from Pause, which
+        only stops the clock from ticking down. Total raised, chat/Discord shoutouts, and
+        giveaway entries keep working normally either way; this just freezes the timer itself
+        (e.g. once it's run its course near the end of the campaign).
+      </p>
+      <div class="msg" id="time-additions-msg"></div>
     </div>
 
     <div class="panel">
@@ -587,6 +599,13 @@
       btn.className = active ? 'danger' : '';
     }
 
+    function renderTimeAdditionsStatus(enabled) {
+      document.getElementById('status-time-additions').textContent = enabled ? 'ON' : 'OFF';
+      const btn = document.getElementById('time-additions-btn');
+      btn.textContent = enabled ? 'Disable Time Additions' : 'Enable Time Additions';
+      btn.className = enabled ? '' : 'danger';
+    }
+
     function renderZooEventsStatus(active) {
       document.getElementById('status-zoo-events').textContent = active ? 'ON' : 'OFF';
       const btn = document.getElementById('zoo-events-btn');
@@ -685,6 +704,7 @@
       renderScheduleStatus(state.scheduledStartAt);
       renderBaseStatus(state.baseSeconds);
       renderBonusTimeStatus(state.bonusTimeActive);
+      renderTimeAdditionsStatus(state.timeAdditionsEnabled);
       renderIncentives(state.incentives);
       renderMilestoneRows(state.milestones);
       renderZooEventsStatus(state.zooEventsActive);
@@ -747,6 +767,9 @@
     });
     socket.on('bonusTimeUpdate', (data) => {
       renderBonusTimeStatus(data.bonusTimeActive);
+    });
+    socket.on('timeAdditionsUpdate', (data) => {
+      renderTimeAdditionsStatus(data.timeAdditionsEnabled);
     });
     socket.on('incentivesUpdate', (data) => {
       renderIncentives(data.incentives);
@@ -884,6 +907,28 @@
         msgEl.className = 'msg ok';
       } else {
         msgEl.textContent = 'Failed to toggle bonus time.';
+        msgEl.className = 'msg err';
+      }
+    });
+
+    document.getElementById('time-additions-btn').addEventListener('click', async () => {
+      const msgEl = document.getElementById('time-additions-msg');
+      const currentlyEnabled = document.getElementById('status-time-additions').textContent === 'ON';
+      const enabled = !currentlyEnabled;
+      const res = await apiFetch('/admin/timer/time-additions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        renderTimeAdditionsStatus(data.timeAdditionsEnabled);
+        msgEl.textContent = data.timeAdditionsEnabled
+          ? 'Time additions enabled — donations add time to the timer again.'
+          : 'Time additions disabled — donations no longer add time to the timer.';
+        msgEl.className = 'msg ok';
+      } else {
+        msgEl.textContent = 'Failed to toggle time additions.';
         msgEl.className = 'msg err';
       }
     });

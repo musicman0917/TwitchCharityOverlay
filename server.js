@@ -300,6 +300,12 @@ const state = {
   // SECONDS_PER_DOLLAR -- for bonus-time streams/days like the birthday
   // stream (toggled manually via the admin portal).
   bonusTimeActive: persisted.bonusTimeActive ?? false,
+  // When off, donations stop adding time to the countdown entirely (e.g.
+  // once the timer's already run its course near the end of the campaign)
+  // while everything else about a donation still happens as normal --
+  // total raised, chat/Discord announcements, incentive callouts, and
+  // giveaway entries are untouched either way.
+  timeAdditionsEnabled: persisted.timeAdditionsEnabled ?? true,
   // Fundraiser Incentives from DonorDrive (e.g. "$50 - I'll do a dare!").
   // Not persisted -- cheap to re-fetch on boot, and always shown fresh from
   // the API rather than a possibly-stale snapshot.
@@ -337,6 +343,7 @@ function saveState() {
     timerPaused: state.timerPaused,
     scheduledStartAt: state.scheduledStartAt,
     bonusTimeActive: state.bonusTimeActive,
+    timeAdditionsEnabled: state.timeAdditionsEnabled,
     milestones: state.milestones,
     zooEventsActive: state.zooEventsActive,
     giveawayEntries: state.giveawayEntries,
@@ -386,6 +393,7 @@ function serializeState() {
     timerPaused: state.timerPaused,
     scheduledStartAt: state.scheduledStartAt,
     bonusTimeActive: state.bonusTimeActive,
+    timeAdditionsEnabled: state.timeAdditionsEnabled,
     incentives: state.incentives,
     zooEvents: zooEvents,
     zooEventsActive: state.zooEventsActive,
@@ -668,13 +676,13 @@ async function pollDonations() {
       const name = isAnonymous ? 'Anonymous' : donation.displayName.trim();
 
       const perDollarRate = state.bonusTimeActive ? BONUS_TIME_SECONDS_PER_DOLLAR : SECONDS_PER_DOLLAR;
-      const secondsToAdd = Math.floor(amount) * perDollarRate;
+      const secondsToAdd = state.timeAdditionsEnabled ? Math.floor(amount) * perDollarRate : 0;
       state.currentTimer += secondsToAdd;
 
       state.latestDonorName = name;
       state.latestDonorAmount = amount;
 
-      console.log(`[donation] ${name} donated $${amount.toFixed(2)} (+${secondsToAdd}s${state.bonusTimeActive ? ', bonus time active' : ''})`);
+      console.log(`[donation] ${name} donated $${amount.toFixed(2)} (+${secondsToAdd}s${state.bonusTimeActive ? ', bonus time active' : ''}${state.timeAdditionsEnabled ? '' : ', time additions disabled'})`);
 
       io.emit('newDonation', { name, amount });
       io.emit('timerTick', { currentTimer: state.currentTimer, timerPaused: state.timerPaused });
@@ -1004,6 +1012,18 @@ app.post('/admin/timer/bonus-time', requireAdminAuth, (req, res) => {
   io.emit('bonusTimeUpdate', { bonusTimeActive: state.bonusTimeActive });
   saveState();
   res.json({ ok: true, bonusTimeActive: state.bonusTimeActive });
+});
+
+// Stops donations from adding time to the countdown at all, independent of
+// Pause/Resume (which stops the countdown from ticking down) -- total
+// raised, chat/Discord announcements, and giveaway entries keep working
+// as normal either way.
+app.post('/admin/timer/time-additions', requireAdminAuth, (req, res) => {
+  state.timeAdditionsEnabled = !!(req.body && req.body.enabled);
+  console.log(`[timer] time additions ${state.timeAdditionsEnabled ? 'enabled' : 'disabled'}`);
+  io.emit('timeAdditionsUpdate', { timeAdditionsEnabled: state.timeAdditionsEnabled });
+  saveState();
+  res.json({ ok: true, timeAdditionsEnabled: state.timeAdditionsEnabled });
 });
 
 // -- Zoo events editor (Cincinnati Zoo showtimes for the 9/17 stream) --
